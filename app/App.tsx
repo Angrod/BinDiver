@@ -1,5 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppDataProvider, useAppData } from './src/state/AppData';
 import { ScanScreen } from './src/screens/ScanScreen';
 import { SetupScreen } from './src/screens/SetupScreen';
@@ -17,10 +18,12 @@ function Root() {
 
 export default function App() {
   return (
-    <AppDataProvider>
-      <Root />
-      <StatusBar style="auto" />
-    </AppDataProvider>
+    <SafeAreaProvider>
+      <AppDataProvider>
+        <Root />
+        <StatusBar style="auto" />
+      </AppDataProvider>
+    </SafeAreaProvider>
   );
 }
 

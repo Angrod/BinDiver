@@ -2,8 +2,9 @@ import { setAudioModeAsync, useAudioPlayer } from 'expo-audio';
 import { useKeepAwake } from 'expo-keep-awake';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  AppState, Button, LayoutChangeEvent, Linking, Pressable, SafeAreaView, StyleSheet, Text, View,
+  AppState, Button, LayoutChangeEvent, Linking, Pressable, StyleSheet, Text, View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Camera, useCameraDevice, useCameraPermission } from 'react-native-vision-camera';
 import { isStale } from '../data/policy';
 import type { CardMatch } from '../game/types';

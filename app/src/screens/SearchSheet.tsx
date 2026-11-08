@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import {
-  Button, Modal, Pressable, SafeAreaView, StyleSheet, Text, TextInput, View,
+  Button, Modal, Pressable, StyleSheet, Text, TextInput, View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppData } from '../state/AppData';
 import type { CardMatch } from '../game/types';
 

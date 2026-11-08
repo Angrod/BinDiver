@@ -2,8 +2,9 @@ import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Alert, Button, FlatList, Modal, SafeAreaView, StyleSheet, Switch, Text, TextInput, View,
+  Alert, Button, FlatList, Modal, StyleSheet, Switch, Text, TextInput, View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { unmatchedToCsv, type UnmatchedRow } from '../scan/unmatched';
 import { useAppData } from '../state/AppData';
 import { runToCsv, summarizeRun } from '../user/runReport';
