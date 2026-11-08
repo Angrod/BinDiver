@@ -49,10 +49,10 @@ describe('readDue', () => {
     });
     expect(sent).toEqual([true, false, false, false, true, false, false, true]);
   });
-  it('uses the 200 ms read interval by default', () => {
+  it('uses a 200 ms read interval', () => {
     expect(READ_INTERVAL_MS).toBe(200);
-    expect(readDue(1199, 1000)).toBe(false);
-    expect(readDue(1200, 1000)).toBe(true);
+    expect(readDue(1199, 1000, READ_INTERVAL_MS)).toBe(false);
+    expect(readDue(1200, 1000, READ_INTERVAL_MS)).toBe(true);
   });
   it('restarts when the clock goes backwards', () => {
     expect(readDue(50, 1000, 200)).toBe(true);

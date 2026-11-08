@@ -10,10 +10,11 @@ import type { Size } from './geometry';
 export const READ_INTERVAL_MS = 200;
 
 /**
- * Whether a read at `nowMs` may be sent, given the last one sent at `lastMs`.
- * A clock that went backwards restarts the gap. Runs in the frame worklet, on frame timestamps.
+ * Whether a read at `nowMs` may be sent, given the last one sent at `lastMs` (pass READ_INTERVAL_MS).
+ * A clock that went backwards restarts the gap. Runs in the frame worklet, on frame timestamps;
+ * no default parameter, since a worklet's default cannot see module constants.
  */
-export function readDue(nowMs: number, lastMs: number, intervalMs: number = READ_INTERVAL_MS): boolean {
+export function readDue(nowMs: number, lastMs: number, intervalMs: number): boolean {
   'worklet';
   return nowMs - lastMs >= intervalMs || nowMs < lastMs;
 }
