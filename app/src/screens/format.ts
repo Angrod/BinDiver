@@ -32,8 +32,11 @@ export function formatLastRead(text: string, matched: string | null): string {
   return `“${text}” → ${matched ?? 'none'}`;
 }
 
-export function formatCounters(ocrErrors: number, dropped: number): string {
-  return `OCR errors ${ocrErrors} · dropped ${dropped}`;
+export function formatCounters(
+  ocrErrors: number, dropped: number, zoom: { actual: number; target: number } | null,
+): string {
+  const base = `OCR errors ${ocrErrors} · dropped ${dropped}`;
+  return zoom === null ? base : `${base} · zoom ${zoom.actual.toFixed(1)} (want ${zoom.target.toFixed(1)})`;
 }
 
 export function versionsLine(n: number): string {

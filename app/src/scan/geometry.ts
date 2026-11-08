@@ -37,6 +37,18 @@ export function cameraZoom(d: ZoomInfo): number {
   return d.maxZoom > 0 ? Math.min(want, d.maxZoom) : want;
 }
 
+/** How far the live zoom may sit from the target before it is set again. */
+const ZOOM_TOLERANCE = 0.05;
+
+/**
+ * The zoom to set now, or null to leave it: the target, capped at the live maximum when that is known,
+ * whenever the live zoom has drifted from it (Android's camera drops back to 1x on every stop and start).
+ */
+export function zoomToApply(actual: number, target: number, maxZoom: number): number | null {
+  const want = maxZoom > 0 ? Math.min(target, maxZoom) : target;
+  return Math.abs(actual - want) > ZOOM_TOLERANCE ? want : null;
+}
+
 /** The card-shaped outline, centred in the view. */
 export function cardOutline(view: Size): Rect {
   const height = Math.min(OUTLINE_SHARE * view.height, (OUTLINE_SHARE * view.width) / CARD_ASPECT);

@@ -1,4 +1,4 @@
-import { CAMERA_ZOOM_X, cameraZoom, cardOutline, titleBand, viewRectToFrameRegion } from '../geometry';
+import { CAMERA_ZOOM_X, cameraZoom, cardOutline, titleBand, viewRectToFrameRegion, zoomToApply } from '../geometry';
 
 function expectRect(actual: { x: number; y: number; width: number; height: number }, e: { x: number; y: number; width: number; height: number }) {
   expect(actual.x).toBeCloseTo(e.x, 4);
@@ -57,5 +57,24 @@ describe('cameraZoom', () => {
   });
   it('ignores an unknown (zero) maximum', () => {
     expect(cameraZoom({ physicalTypes: [], zoomLensSwitchFactors: [], maxZoom: 0 })).toBe(CAMERA_ZOOM_X);
+  });
+});
+
+describe('zoomToApply', () => {
+  // Android's camera drops back to 1x each time it stops and starts, so the scan screen
+  // checks the live zoom and sets it again when it has drifted from the target.
+  it('asks for the target when the camera has fallen back to 1x', () => {
+    expect(zoomToApply(1, 2, 8)).toBe(2);
+  });
+  it('leaves a zoom that is at the target, or within 0.05 of it', () => {
+    expect(zoomToApply(2, 2, 8)).toBeNull();
+    expect(zoomToApply(1.97, 2, 8)).toBeNull();
+  });
+  it('caps the target at the live maximum zoom', () => {
+    expect(zoomToApply(1, 2, 1.5)).toBe(1.5);
+    expect(zoomToApply(1.5, 2, 1.5)).toBeNull();
+  });
+  it('uses the target as is when the maximum is not known', () => {
+    expect(zoomToApply(1, 2, 0)).toBe(2);
   });
 });

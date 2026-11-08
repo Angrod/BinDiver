@@ -5,12 +5,12 @@ import {
   AppState, Button, LayoutChangeEvent, Linking, Pressable, StyleSheet, Text, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Camera, useCameraDevice, useCameraPermission } from 'react-native-vision-camera';
+import { Camera, useCameraDevice, useCameraPermission, type CameraRef } from 'react-native-vision-camera';
 import { isStale } from '../data/policy';
 import type { CardMatch } from '../game/types';
 import { CommitTracker } from '../scan/commit';
 import {
-  cameraZoom, cardOutline, titleBand, viewRectToFrameRegion, type Rect, type Size,
+  cameraZoom, cardOutline, titleBand, viewRectToFrameRegion, zoomToApply, type Rect, type Size,
 } from '../scan/geometry';
 import { titleCandidates, type OcrLine } from '../scan/lines';
 import { commitKey, qualifyingVersions } from '../scan/reading';
@@ -93,7 +93,28 @@ export function ScanScreen() {
     console.warn('camera error', e);
     setCameraError(e.message);
   }, []);
-  const onCameraStarted = useCallback(() => setCameraError(null), []);
+  // Android's camera drops back to 1x each time it stops and starts (a sheet opening or closing, the app
+  // going to the background), and the zoom given when the camera is created can land before it is open.
+  // So the zoom is checked when the camera starts and on every diagnostics tick, and set again if it has
+  // drifted. On iOS the zoom holds, so this only reads it for the debug line.
+  const cameraRef = useRef<CameraRef>(null);
+  const zoomWarned = useRef(false);
+  const checkZoom = useCallback((): { actual: number; target: number } | null => {
+    const c = cameraRef.current?.controller;
+    if (zoom === undefined || c === undefined) return null;
+    const next = zoomToApply(c.zoom, zoom, c.maxZoom);
+    if (next !== null) {
+      c.setZoom(next).catch((e: unknown) => {
+        if (!zoomWarned.current) console.warn('zoom failed', e);
+        zoomWarned.current = true;
+      });
+    }
+    return { actual: c.zoom, target: zoom };
+  }, [zoom]);
+  const onCameraStarted = useCallback(() => {
+    setCameraError(null);
+    checkZoom();
+  }, [checkZoom]);
 
   // Geometry: only once the camera view has a real size (a zero size would give NaN% regions).
   const [viewSize, setViewSize] = useState<Size | null>(null);
@@ -194,8 +215,10 @@ export function ScanScreen() {
           ? formatLastRead(normalizeLine(matchedText), match.name)
           : formatLastRead(normalizeLine(candidates[0]), null);
       }
+      // Keep the lines only when the whole read found nothing: a joined row that missed while one of
+      // its lines matched is a good read, not a line to tune for.
       const r = runRef.current;
-      if (r !== null && noMatch.length > 0) {
+      if (r !== null && match === null && noMatch.length > 0) {
         if (unmatched.current?.runId !== r.id) unmatched.current = { runId: r.id, lines: new UnmatchedLines() };
         for (const t of noMatch) unmatched.current.lines.add(t);
       }
@@ -218,16 +241,18 @@ export function ScanScreen() {
 
   // Diagnostics for the device run: one timer copies the last read and the counters into state.
   const [diag, setDiag] = useState<{ lastRead: string | null; counters: string }>(() => ({
-    lastRead: null, counters: formatCounters(0, 0),
+    lastRead: null, counters: formatCounters(0, 0, null),
   }));
   useEffect(() => {
     const id = setInterval(() => {
       const { ocrErrors, droppedFrames } = readCounts();
-      const next = { lastRead: lastRead.current, counters: formatCounters(ocrErrors, droppedFrames) };
+      // A stopped camera can't take a zoom, so only check it while the camera is on.
+      const zoomNow = cameraOn ? checkZoom() : null;
+      const next = { lastRead: lastRead.current, counters: formatCounters(ocrErrors, droppedFrames, zoomNow) };
       setDiag((d) => (d.lastRead === next.lastRead && d.counters === next.counters ? d : next));
     }, DIAGNOSTICS_MS);
     return () => clearInterval(id);
-  }, [readCounts]);
+  }, [readCounts, cameraOn, checkZoom]);
 
   // Search
   const onPick = (m: CardMatch) => {
@@ -272,6 +297,7 @@ export function ScanScreen() {
       <View style={styles.cameraBox} onLayout={onCameraLayout}>
         {hasPermission && device !== undefined && geometry !== null && (
           <Camera
+            ref={cameraRef}
             style={StyleSheet.absoluteFill}
             device={device}
             isActive={cameraOn}
