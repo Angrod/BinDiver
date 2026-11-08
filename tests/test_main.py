@@ -49,3 +49,18 @@ def test_phone_db_command_is_accepted(tmp_path, monkeypatch, capsys):
 
     cli.main(["phone-db"])
     assert capsys.readouterr().out.strip() == "Phone database: 50.0 MB, zip 22.0 MB, prices as of 2026-11-03"
+
+
+def test_golden_command_is_accepted(tmp_path, monkeypatch, capsys):
+    import bindiver.__main__ as cli
+    db = tmp_path / "cards.sqlite"
+    db.touch()
+    seen = {}
+    monkeypatch.setattr(cli, "DB_FILE", db)
+    monkeypatch.setattr(cli, "icon_uris_needed", lambda db: {})
+    monkeypatch.setattr(cli, "fetch_set_icons", lambda uris, data_dir: {})
+    monkeypatch.setattr(cli, "write_golden", lambda src, out, icons: seen.update(out=out))
+
+    cli.main(["golden", "--out", str(tmp_path / "g")])
+    assert seen["out"] == tmp_path / "g"
+    assert "g" in capsys.readouterr().out
