@@ -8,7 +8,9 @@ import { Camera, useCameraDevice, useCameraPermission } from 'react-native-visio
 import { isStale } from '../data/policy';
 import type { CardMatch } from '../game/types';
 import { CommitTracker } from '../scan/commit';
-import { cardOutline, titleBand, viewRectToFrameRegion, type Rect, type Size } from '../scan/geometry';
+import {
+  cameraZoom, cardOutline, titleBand, viewRectToFrameRegion, type Rect, type Size,
+} from '../scan/geometry';
 import { topLine, type OcrLine } from '../scan/lines';
 import { commitKey, qualifyingVersions } from '../scan/reading';
 import { useTitleReader } from '../scan/useTitleReader';
@@ -67,6 +69,18 @@ export function ScanScreen() {
 
   // Camera
   const device = useCameraDevice('back');
+  // Zoom in so a card filling the outline sits far enough away for the camera to focus.
+  const zoom = useMemo(
+    () =>
+      device === undefined
+        ? undefined
+        : cameraZoom({
+          physicalTypes: device.physicalDevices.map((d) => d.type),
+          zoomLensSwitchFactors: device.zoomLensSwitchFactors,
+          maxZoom: device.maxZoom,
+        }),
+    [device],
+  );
   const { hasPermission, canRequestPermission, requestPermission } = useCameraPermission();
   useEffect(() => {
     if (!hasPermission && canRequestPermission) void requestPermission();
@@ -217,6 +231,10 @@ export function ScanScreen() {
             isActive={cameraOn}
             outputs={[frameOutput]}
             constraints={[{ resolutionBias: frameOutput }]}
+            // The app is portrait-only: follow the interface, not the accelerometer, so tilting the
+            // phone over a bin never rotates the frames (and the OCR crop) away from the title band.
+            orientationSource="interface"
+            zoom={zoom}
             resizeMode="cover"
             onError={onCameraError}
             onStarted={onCameraStarted}

@@ -8,6 +8,34 @@ export const OUTLINE_SHARE = 0.88; // outline fits within 88% of the view in bot
 export const BAND_TOP = 0.03;
 export const BAND_HEIGHT = 0.12; // title strip, as shares of the outline's height
 export const FRAME_ASPECT = 9 / 16; // display-oriented frame (CommonResolutions.FHD_16_9)
+/**
+ * Field of view relative to the main camera; tune at the gate.
+ * At 1× a card filling the outline sits about 13–14 cm away, likely closer than the main camera can focus.
+ */
+export const CAMERA_ZOOM_X = 2;
+
+/** What the zoom choice needs from a VisionCamera CameraDevice. */
+export interface ZoomInfo {
+  /** The types of the device's physical cameras, in the device's order; empty for a single camera. */
+  physicalTypes: string[];
+  /** The zoom values at which a multi-camera device switches to its next physical camera. */
+  zoomLensSwitchFactors: number[];
+  /** The device's maximum zoom; 0 when not yet known (Android before the camera opens). */
+  maxZoom: number;
+}
+
+/**
+ * The camera zoom: CAMERA_ZOOM_X times the zoom that shows the main (wide-angle) camera's view,
+ * capped at the device maximum when that is known.
+ * The neutral zoom is 1, except on a multi-camera device whose wide-angle camera comes after another
+ * (an ultra-wide): there it is the switch factor into the wide-angle camera.
+ */
+export function cameraZoom(d: ZoomInfo): number {
+  const wide = d.physicalTypes.indexOf('wide-angle');
+  const neutral = wide > 0 ? (d.zoomLensSwitchFactors[wide - 1] ?? 1) : 1;
+  const want = CAMERA_ZOOM_X * neutral;
+  return d.maxZoom > 0 ? Math.min(want, d.maxZoom) : want;
+}
 
 /** The card-shaped outline, centred in the view. */
 export function cardOutline(view: Size): Rect {

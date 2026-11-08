@@ -1,4 +1,4 @@
-import { cardOutline, titleBand, viewRectToFrameRegion } from '../geometry';
+import { CAMERA_ZOOM_X, cameraZoom, cardOutline, titleBand, viewRectToFrameRegion } from '../geometry';
 
 function expectRect(actual: { x: number; y: number; width: number; height: number }, e: { x: number; y: number; width: number; height: number }) {
   expect(actual.x).toBeCloseTo(e.x, 4);
@@ -41,5 +41,21 @@ describe('viewRectToFrameRegion', () => {
     expect(viewRectToFrameRegion({ x: 0, y: 0, ...view }, view)).toEqual({
       left: '5.56%', top: '0.00%', width: '88.89%', height: '100.00%',
     });
+  });
+});
+
+describe('cameraZoom', () => {
+  it('is CAMERA_ZOOM_X on a single wide-angle camera', () => {
+    expect(cameraZoom({ physicalTypes: [], zoomLensSwitchFactors: [], maxZoom: 100 })).toBe(CAMERA_ZOOM_X);
+  });
+  it('counts from the wide-angle camera when an ultra-wide comes first', () => {
+    const triple = { physicalTypes: ['ultra-wide-angle', 'wide-angle', 'telephoto'], zoomLensSwitchFactors: [2, 6] };
+    expect(cameraZoom({ ...triple, maxZoom: 100 })).toBe(CAMERA_ZOOM_X * 2);
+  });
+  it('is capped at the device maximum', () => {
+    expect(cameraZoom({ physicalTypes: [], zoomLensSwitchFactors: [], maxZoom: 1.5 })).toBe(1.5);
+  });
+  it('ignores an unknown (zero) maximum', () => {
+    expect(cameraZoom({ physicalTypes: [], zoomLensSwitchFactors: [], maxZoom: 0 })).toBe(CAMERA_ZOOM_X);
   });
 });
