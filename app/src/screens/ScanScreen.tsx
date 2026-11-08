@@ -11,7 +11,7 @@ import { CommitTracker } from '../scan/commit';
 import {
   cameraZoom, cardOutline, titleBand, viewRectToFrameRegion, type Rect, type Size,
 } from '../scan/geometry';
-import { topLine, type OcrLine } from '../scan/lines';
+import { titleCandidates, type OcrLine } from '../scan/lines';
 import { commitKey, qualifyingVersions } from '../scan/reading';
 import { useTitleReader } from '../scan/useTitleReader';
 import { useAppData } from '../state/AppData';
@@ -160,15 +160,16 @@ export function ScanScreen() {
       }
       const g = gameRef.current;
       if (!g) return; // cards are loading or being swapped: skip the frame
-      const line = topLine(lines);
+      // The top row joined, then each of its lines alone: the first match wins.
       let match: CardMatch | null = null;
-      if (line) {
+      for (const candidate of titleCandidates(lines)) {
         try {
-          match = g.matchTitle(line.text);
+          match = g.matchTitle(candidate);
         } catch (e) {
           console.warn('matchTitle failed', e);
           match = null;
         }
+        if (match !== null) break;
       }
       const committed = tracker.current.push(commitKey(match));
       if (committed === null || match === null) return;
