@@ -4,19 +4,24 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Alert, Button, FlatList, Modal, SafeAreaView, StyleSheet, Switch, Text, TextInput, View,
 } from 'react-native';
+import { unmatchedToCsv, type UnmatchedRow } from '../scan/unmatched';
 import { useAppData } from '../state/AppData';
 import { runToCsv, summarizeRun } from '../user/runReport';
 import type { Scan, TestRun } from '../user/store';
 import { formatReadRight, formatSecondsPerCard, parseStackCount, timeOfDay } from './format';
 
+const UNMATCHED_SHOWN = 50;
+
 interface Props {
   visible: boolean;
+  /** The candidate texts that matched nothing in the run just stopped (kept in memory only). */
+  unmatched: { runId: number; rows: UnmatchedRow[] } | null;
   onStart(stackCount: number): void;
   onClose(): void;
 }
 
 /** Test runs: start one, and review, mark and export the last finished one. */
-export function RunScreen({ visible, onStart, onClose }: Props) {
+export function RunScreen({ visible, unmatched, onStart, onClose }: Props) {
   const { user } = useAppData();
   const [stackText, setStackText] = useState('');
   const [last, setLast] = useState<TestRun | null>(null);
@@ -41,19 +46,31 @@ export function RunScreen({ visible, onStart, onClose }: Props) {
     setScans((list) => list.map((s) => (s.id === scan.id ? { ...s, markedWrong: wrong } : s)));
   };
 
-  const exportRun = async () => {
-    if (!last) return;
+  const unmatchedRows = last && unmatched?.runId === last.id ? unmatched.rows : null;
+
+  /** Writes a CSV to the cache and opens the share sheet. */
+  const shareCsv = async (name: string, csv: () => string) => {
     setExporting(true);
     try {
-      const file = new File(Paths.cache, `bindiver-run-${last.id}.csv`);
+      const file = new File(Paths.cache, name);
       file.create({ overwrite: true });
-      await file.write(runToCsv(user.runScans(last.id)));
+      await file.write(csv());
       await Sharing.shareAsync(file.uri, { mimeType: 'text/csv' });
     } catch (e) {
       Alert.alert('Export failed', e instanceof Error ? e.message : String(e));
     } finally {
       setExporting(false);
     }
+  };
+  const exportRun = async () => {
+    if (!last) return;
+    const id = last.id;
+    await shareCsv(`bindiver-run-${id}.csv`, () => runToCsv(user.runScans(id)));
+  };
+  const exportUnmatched = async () => {
+    if (!last || !unmatchedRows) return;
+    const rows = unmatchedRows;
+    await shareCsv(`bindiver-run-${last.id}-unmatched.csv`, () => unmatchedToCsv(rows));
   };
 
   const start = () => {
@@ -94,6 +111,25 @@ export function RunScreen({ visible, onStart, onClose }: Props) {
           <View style={styles.export}>
             <Button title="Export" onPress={() => void exportRun()} disabled={exporting} />
           </View>
+          {unmatchedRows && (
+            <>
+              <Text style={styles.section}>Lines that matched nothing</Text>
+              {unmatchedRows.length === 0 && <Text style={styles.rowLabel}>None</Text>}
+              {unmatchedRows.slice(0, UNMATCHED_SHOWN).map((r) => (
+                <View key={r.text} style={styles.row}>
+                  <Text style={[styles.rowLabel, styles.unmatchedText]} numberOfLines={1}>{r.text}</Text>
+                  <Text style={styles.rowValue}>{r.count}</Text>
+                </View>
+              ))}
+              <View style={styles.export}>
+                <Button
+                  title="Export unmatched"
+                  onPress={() => void exportUnmatched()}
+                  disabled={exporting || unmatchedRows.length === 0}
+                />
+              </View>
+            </>
+          )}
         </View>
       )}
     </View>
@@ -155,6 +191,7 @@ const styles = StyleSheet.create({
   rowLabel: { fontSize: 16, color: '#333' },
   rowValue: { fontSize: 16, fontWeight: '600', color: '#111', fontVariant: ['tabular-nums'] },
   export: { alignItems: 'flex-start' },
+  unmatchedText: { flex: 1, marginRight: 12 },
   scan: {
     flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 10,
     borderTopWidth: StyleSheet.hairlineWidth, borderColor: '#bbb',

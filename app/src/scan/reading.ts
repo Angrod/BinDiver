@@ -9,17 +9,21 @@ import type { Size } from './geometry';
  */
 export const READ_INTERVAL_MS = 200;
 
-/** Lets a read through only when `intervalMs` has passed since the last one let through. */
-export class ReadThrottle {
-  private last = Number.NEGATIVE_INFINITY;
+/**
+ * Whether a read at `nowMs` may be sent, given the last one sent at `lastMs`.
+ * A clock that went backwards restarts the gap. Runs in the frame worklet, on frame timestamps.
+ */
+export function readDue(nowMs: number, lastMs: number, intervalMs: number = READ_INTERVAL_MS): boolean {
+  'worklet';
+  return nowMs - lastMs >= intervalMs || nowMs < lastMs;
+}
 
-  constructor(private readonly intervalMs: number = READ_INTERVAL_MS) {}
-
-  accept(now: number): boolean {
-    if (now - this.last < this.intervalMs) return false;
-    this.last = now;
-    return true;
-  }
+/**
+ * Milliseconds per unit of VisionCamera 5.2's Frame.timestamp: iOS reports seconds
+ * (CMTime.seconds), Android nanoseconds (CameraX ImageInfo.timestamp).
+ */
+export function frameMsPerUnit(os: string): number {
+  return os === 'android' ? 1e-6 : 1000;
 }
 
 /** What the commit tracker compares: the card's oracle IDs, or the name for a token. */

@@ -13,14 +13,16 @@ import {
 } from '../scan/geometry';
 import { titleCandidates, type OcrLine } from '../scan/lines';
 import { commitKey, qualifyingVersions } from '../scan/reading';
+import { normalizeLine, UnmatchedLines, type UnmatchedRow } from '../scan/unmatched';
 import { useTitleReader } from '../scan/useTitleReader';
 import { useAppData } from '../state/AppData';
 import type { TestRun } from '../user/store';
-import { formatElapsed, formatFrameSize, versionsLine } from './format';
+import { formatCounters, formatElapsed, formatFrameSize, formatLastRead, versionsLine } from './format';
 import { RunScreen } from './RunScreen';
 import { SearchSheet } from './SearchSheet';
 
 const MIN_CENTS = 1000; // $10
+const DIAGNOSTICS_MS = 500; // the debug line and counters re-render at most this often
 const BAND = '#ff9f43';
 const AMBER = '#e5a50a';
 
@@ -107,8 +109,10 @@ export function ScanScreen() {
     return { outline, band, region: viewRectToFrameRegion(band, viewSize) };
   }, [viewSize]);
 
-  const cameraOn = hasPermission && device !== undefined && geometry !== null && appActive && !paused;
-  const readerOn = cameraOn && !searchOpen && !runOpen;
+  // The camera (and with it the reader) is off while the Search or Run sheet is open,
+  // as well as when paused by a tap or with the app in the background.
+  const cameraOn = hasPermission && device !== undefined && geometry !== null && appActive && !paused
+    && !searchOpen && !runOpen;
 
   // Recording
   const record = useCallback(
@@ -152,6 +156,11 @@ export function ScanScreen() {
   // Camera reads
   const tracker = useRef(new CommitTracker());
   const sawFrame = useRef(false);
+  /** The last candidate read and its result, for the debug line; rendered by the diagnostics timer. */
+  const lastRead = useRef<string | null>(null);
+  /** The current run's candidate texts that matched nothing (in memory only). */
+  const unmatched = useRef<{ runId: number; lines: UnmatchedLines } | null>(null);
+  const [lastUnmatched, setLastUnmatched] = useState<{ runId: number; rows: UnmatchedRow[] } | null>(null);
   const onText = useCallback(
     (rawText: string, lines: OcrLine[], size: Size) => {
       if (!sawFrame.current) {
@@ -161,15 +170,33 @@ export function ScanScreen() {
       const g = gameRef.current;
       if (!g) return; // cards are loading or being swapped: skip the frame
       // The top row joined, then each of its lines alone: the first match wins.
+      const candidates = titleCandidates(lines);
       let match: CardMatch | null = null;
-      for (const candidate of titleCandidates(lines)) {
+      let matchedText = '';
+      const noMatch: string[] = [];
+      for (const candidate of candidates) {
         try {
           match = g.matchTitle(candidate);
         } catch (e) {
           console.warn('matchTitle failed', e);
           match = null;
+          continue;
         }
-        if (match !== null) break;
+        if (match !== null) {
+          matchedText = candidate;
+          break;
+        }
+        noMatch.push(candidate);
+      }
+      if (candidates.length > 0) {
+        lastRead.current = match
+          ? formatLastRead(normalizeLine(matchedText), match.name)
+          : formatLastRead(normalizeLine(candidates[0]), null);
+      }
+      const r = runRef.current;
+      if (r !== null && noMatch.length > 0) {
+        if (unmatched.current?.runId !== r.id) unmatched.current = { runId: r.id, lines: new UnmatchedLines() };
+        for (const t of noMatch) unmatched.current.lines.add(t);
       }
       const committed = tracker.current.push(commitKey(match));
       if (committed === null || match === null) return;
@@ -186,7 +213,20 @@ export function ScanScreen() {
     [playTick, record, show, versionsFor],
   );
 
-  const { frameOutput } = useTitleReader({ region: geometry?.region ?? null, active: readerOn, onText });
+  const { frameOutput, readCounts } = useTitleReader({ region: geometry?.region ?? null, active: cameraOn, onText });
+
+  // Diagnostics for the device run: one timer copies the last read and the counters into state.
+  const [diag, setDiag] = useState<{ lastRead: string | null; counters: string }>(() => ({
+    lastRead: null, counters: formatCounters(0, 0),
+  }));
+  useEffect(() => {
+    const id = setInterval(() => {
+      const { ocrErrors, droppedFrames } = readCounts();
+      const next = { lastRead: lastRead.current, counters: formatCounters(ocrErrors, droppedFrames) };
+      setDiag((d) => (d.lastRead === next.lastRead && d.counters === next.counters ? d : next));
+    }, DIAGNOSTICS_MS);
+    return () => clearInterval(id);
+  }, [readCounts]);
 
   // Search
   const onPick = (m: CardMatch) => {
@@ -204,6 +244,7 @@ export function ScanScreen() {
     const id = user.startRun(stackCount, at);
     setRun({ id, startedAt: at, stoppedAt: null, stackCount });
     setRunCount(0);
+    unmatched.current = { runId: id, lines: new UnmatchedLines() };
     // A fresh streak, so the card under the camera can commit into the run even if it was read just before.
     tracker.current = new CommitTracker();
     setShown(null);
@@ -212,6 +253,9 @@ export function ScanScreen() {
   const stopRun = () => {
     if (!run) return;
     user.stopRun(run.id, new Date().toISOString());
+    const u = unmatched.current;
+    setLastUnmatched({ runId: run.id, rows: u?.runId === run.id ? u.lines.top() : [] });
+    unmatched.current = null;
     setRun(null);
     setRunOpen(true);
   };
@@ -274,6 +318,8 @@ export function ScanScreen() {
       <View style={styles.bottom}>
         <Text style={styles.hint}>{paused ? 'Tap to resume' : 'Tap to pause'}</Text>
         {frameSize && <Text style={styles.grey}>{formatFrameSize(frameSize)}</Text>}
+        {diag.lastRead !== null && <Text style={styles.debug} numberOfLines={1}>{diag.lastRead}</Text>}
+        <Text style={styles.debug}>{diag.counters}</Text>
         {game === null && <Text style={styles.grey}>Loading cards…</Text>}
 
         <View style={styles.result}>
@@ -305,7 +351,12 @@ export function ScanScreen() {
       </View>
 
       <SearchSheet visible={searchOpen} onPick={onPick} onCancel={() => setSearchOpen(false)} />
-      <RunScreen visible={runOpen} onStart={startRun} onClose={() => setRunOpen(false)} />
+      <RunScreen
+        visible={runOpen}
+        unmatched={lastUnmatched}
+        onStart={startRun}
+        onClose={() => setRunOpen(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -354,6 +405,7 @@ const styles = StyleSheet.create({
   bottom: { flex: 1, paddingHorizontal: 16, paddingTop: 6, paddingBottom: 8, gap: 4 },
   hint: { color: '#bbb', fontSize: 13, textAlign: 'center' },
   grey: { color: '#888', fontSize: 13, textAlign: 'center' },
+  debug: { color: '#777', fontSize: 11, textAlign: 'center' },
   result: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 4 },
   name: { color: '#fff', fontSize: 30, fontWeight: '700', textAlign: 'center' },
   detail: { color: '#ddd', fontSize: 18, textAlign: 'center' },

@@ -1,6 +1,8 @@
 import type { CardGroup } from '../../game/mtg/types';
 import type { CardMatch } from '../../game/types';
-import { commitKey, displayFrameSize, qualifyingVersions, ReadThrottle } from '../reading';
+import {
+  commitKey, displayFrameSize, frameMsPerUnit, qualifyingVersions, readDue, READ_INTERVAL_MS,
+} from '../reading';
 
 const match = (over: Partial<CardMatch>): CardMatch => ({
   oracleIds: [], name: '', match: 'exact', isToken: false, lineUsed: '', ...over,
@@ -37,11 +39,29 @@ describe('qualifyingVersions', () => {
   });
 });
 
-describe('ReadThrottle', () => {
+describe('readDue', () => {
   it('lets the first read through, then one per interval', () => {
-    const t = new ReadThrottle(200);
-    expect([0, 33, 166, 199, 200, 233, 399, 400].map((ms) => t.accept(ms))).toEqual([
-      true, false, false, false, true, false, false, true,
-    ]);
+    let last = Number.NEGATIVE_INFINITY;
+    const sent = [0, 33, 166, 199, 200, 233, 399, 400].map((ms) => {
+      if (!readDue(ms, last, 200)) return false;
+      last = ms;
+      return true;
+    });
+    expect(sent).toEqual([true, false, false, false, true, false, false, true]);
+  });
+  it('uses the 200 ms read interval by default', () => {
+    expect(READ_INTERVAL_MS).toBe(200);
+    expect(readDue(1199, 1000)).toBe(false);
+    expect(readDue(1200, 1000)).toBe(true);
+  });
+  it('restarts when the clock goes backwards', () => {
+    expect(readDue(50, 1000, 200)).toBe(true);
+  });
+});
+
+describe('frameMsPerUnit', () => {
+  it('converts VisionCamera frame timestamps: seconds on iOS, nanoseconds on Android', () => {
+    expect(2.5 * frameMsPerUnit('ios')).toBe(2500);
+    expect(2_500_000_000 * frameMsPerUnit('android')).toBeCloseTo(2500, 6);
   });
 });

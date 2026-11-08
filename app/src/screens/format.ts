@@ -27,6 +27,15 @@ export function formatFrameSize(size: Size): string {
   return `Frame ${size.width}×${size.height}`;
 }
 
+/** The live debug line: the last candidate text read and the card it matched, or none. */
+export function formatLastRead(text: string, matched: string | null): string {
+  return `“${text}” → ${matched ?? 'none'}`;
+}
+
+export function formatCounters(ocrErrors: number, dropped: number): string {
+  return `OCR errors ${ocrErrors} · dropped ${dropped}`;
+}
+
 export function versionsLine(n: number): string {
   return `${n} ${n === 1 ? 'version' : 'versions'} at $10+`;
 }

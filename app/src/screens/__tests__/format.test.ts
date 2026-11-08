@@ -1,5 +1,6 @@
 import {
-  formatElapsed, formatFrameSize, formatReadRight, formatSecondsPerCard, parseStackCount, versionsLine,
+  formatCounters, formatElapsed, formatFrameSize, formatLastRead, formatReadRight, formatSecondsPerCard,
+  parseStackCount, versionsLine,
 } from '../format';
 
 describe('formatElapsed', () => {
@@ -53,5 +54,15 @@ describe('parseStackCount', () => {
   });
   it('rejects anything else', () => {
     for (const s of ['', '0', '-3', '4.5', 'abc', '12a', '99999']) expect(parseStackCount(s)).toBeNull();
+  });
+});
+
+describe('diagnostics', () => {
+  it('shows the last candidate and what it matched', () => {
+    expect(formatLastRead('fireball xr', 'Fireball')).toBe('“fireball xr” → Fireball');
+    expect(formatLastRead('tap add g', null)).toBe('“tap add g” → none');
+  });
+  it('shows the OCR error and dropped frame counts', () => {
+    expect(formatCounters(0, 12)).toBe('OCR errors 0 · dropped 12');
   });
 });
