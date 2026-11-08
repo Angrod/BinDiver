@@ -80,6 +80,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       closeLive();
       setGame(null);
+      setPriceDate(null); // it may have been read before the game failed to build
       setPhase('setup');
       setStatus(`Could not open the card data: ${e instanceof Error ? e.message : String(e)}`);
     }
@@ -91,7 +92,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     busy.current = true;
     try {
       const io = createExpoRefreshIO(cardsDir, closeLive);
-      const result = await refresh(io, priceDate ?? currentPriceDate(liveRef.current));
+      // The local price date comes only from an open live handle, so a recovery download after a
+      // failed load never reports up-to-date against a database that did not open.
+      const result = await refresh(io, currentPriceDate(liveRef.current));
       user.setSetting('last_check_at', new Date().toISOString());
       if (result.status === 'updated' || result.status === 'failed') {
         if (liveRef.current === null || result.status === 'updated') await openLive();
@@ -102,13 +105,16 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     } finally {
       busy.current = false;
     }
-  }, [cardsDir, closeLive, openLive, priceDate, user]);
+  }, [cardsDir, closeLive, openLive, user]);
 
   // Latest closure for use from the AppState listener.
   const runRefreshRef = useRef(runRefresh);
   runRefreshRef.current = runRefresh;
 
   const maybeBackgroundRefresh = useCallback(async () => {
+    // No live handle: the mount's open is still pending, or there are no usable cards yet.
+    // Either way the first download is the SetupScreen's job.
+    if (liveRef.current === null) return;
     if (!new File(cardsDir, LIVE_DB).exists) return;
     if (!needsCheck(user.getSetting('last_check_at'), new Date())) return;
     const net = await currentNetwork();
