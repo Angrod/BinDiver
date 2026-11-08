@@ -1,20 +1,29 @@
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View } from 'react-native';
+import { AppDataProvider, useAppData } from './src/app/AppData';
+import { HomeScreen } from './src/screens/HomeScreen';
+import { SetupScreen } from './src/screens/SetupScreen';
 
-export default function App() {
+function Root() {
+  const { phase, status } = useAppData();
+  if (phase === 'ready') return <HomeScreen />;
+  if (phase === 'setup') return <SetupScreen />;
   return (
-    <View style={styles.container}>
-      <Text>Open up App.tsx to start working on your app!</Text>
-      <StatusBar style="auto" />
+    <View style={styles.center}>
+      <Text>{status || 'Loading cards…'}</Text>
     </View>
   );
 }
 
+export default function App() {
+  return (
+    <AppDataProvider>
+      <Root />
+      <StatusBar style="auto" />
+    </AppDataProvider>
+  );
+}
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 });
