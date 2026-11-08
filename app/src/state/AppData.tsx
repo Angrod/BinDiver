@@ -21,7 +21,7 @@ export interface AppDataValue {
   user: UserStore;
   phase: Phase;
   status: string;
-  downloadNow(confirmedCellular: boolean): Promise<void>;
+  downloadNow(confirmed: boolean): Promise<void>;
 }
 
 const Ctx = createContext<AppDataValue | null>(null);
@@ -133,14 +133,15 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const downloadNow = useCallback(
-    async (confirmedCellular: boolean) => {
+    async (confirmed: boolean) => {
       const net = await currentNetwork();
-      const perm = downloadPermission(net, confirmedCellular);
+      const perm = downloadPermission(net, confirmed);
       if (perm === 'offline') {
         setStatus('Connect to the internet to download the card data.');
         return;
       }
-      if (perm === 'ask') {
+      // A user's confirmation counts as go on any connected network.
+      if (perm === 'ask' && !confirmed) {
         setStatus('Confirm the download to continue.');
         return;
       }

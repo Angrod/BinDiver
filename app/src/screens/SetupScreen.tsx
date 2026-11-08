@@ -21,10 +21,10 @@ export function SetupScreen() {
     return () => sub.remove();
   }, [checkNetwork]);
 
-  const run = async (confirmedCellular: boolean) => {
+  const run = async (confirmed: boolean) => {
     setWorking(true);
     try {
-      await downloadNow(confirmedCellular);
+      await downloadNow(confirmed);
     } finally {
       setWorking(false);
       checkNetwork();
@@ -32,8 +32,9 @@ export function SetupScreen() {
   };
 
   const onDownload = () => {
-    if (network === 'cellular') {
-      Alert.alert('Download about 25 MB on cellular?', undefined, [
+    if (network !== 'wifi') {
+      const title = network === 'cellular' ? 'Download about 25 MB on cellular?' : 'Download about 25 MB?';
+      Alert.alert(title, undefined, [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Download', onPress: () => void run(true) },
       ]);
