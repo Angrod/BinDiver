@@ -60,6 +60,10 @@ export function SearchSheet({ visible, onPick, onCancel }: Props) {
             setNotFound(false);
           }}
           accessibilityLabel="Card name (English)"
+          onSubmitEditing={() => {
+            if (text.trim() !== '') pick(text);
+          }}
+          returnKeyType="search"
           autoFocus
           autoCorrect={false}
           autoCapitalize="none"
