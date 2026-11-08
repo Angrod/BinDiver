@@ -1,0 +1,13 @@
+[project]
+name = "bindiver"
+version = "0.1.0"
+description = "Which versions of this MTG card are worth finding?"
+requires-python = ">=3.12"
+dependencies = ["certifi"]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

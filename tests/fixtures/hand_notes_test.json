@@ -1,0 +1,20 @@
+{
+  "sets": {
+    "lea": {"symbol": false, "source": "https://example.test/lea"},
+    "leb": {"symbol": false, "source": "https://example.test/leb"},
+    "2ed": {"symbol": false, "source": "https://example.test/2ed"},
+    "3ed": {"symbol": false, "source": "https://example.test/3ed"},
+    "ced": {"symbol": false, "back": "Collectors' Edition back", "source": "https://example.test/ced"},
+    "fbb": {"symbol": false, "source": "https://example.test/fbb"},
+    "5ed": {"symbol": false, "except_langs": ["zhs"], "source": "https://example.test/5ed"},
+    "dbl": {"foil": "silver screen foil", "source": "https://example.test/dbl"},
+    "plst": {"stamp": "List stamp (lower left)", "source": "https://example.test/plst"},
+    "nox": {"numbers": false, "source": "https://example.test/nox"}
+  },
+  "pairs": [
+    {"sets": ["lea", "leb"],
+     "notes": {"lea": "Alpha's corners are more rounded than Beta's.",
+               "leb": "Beta's corners are less rounded than Alpha's."},
+     "source": "https://example.test/alpha-beta"}
+  ]
+}

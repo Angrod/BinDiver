@@ -1,0 +1,11 @@
+.venv/
+data/
+__pycache__/
+.pytest_cache/
+.DS_Store
+.superpowers/
+app/node_modules/
+app/.expo/
+app/ios/
+app/android/
+app/dist/

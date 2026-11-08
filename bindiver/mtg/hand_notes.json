@@ -1,0 +1,118 @@
+{
+  "sets": {
+    "lea": {
+      "symbol": false,
+      "source": "https://mtg.wiki/page/Limited_Edition"
+    },
+    "leb": {
+      "symbol": false,
+      "source": "https://mtg.wiki/page/Limited_Edition"
+    },
+    "2ed": {
+      "symbol": false,
+      "source": "https://mtg.wiki/page/Expansion_symbol"
+    },
+    "3ed": {
+      "symbol": false,
+      "source": "https://mtg.wiki/page/Revised_Edition"
+    },
+    "sum": {
+      "symbol": false,
+      "source": "https://mtg.wiki/page/Revised_Edition"
+    },
+    "ced": {
+      "symbol": false,
+      "back": "Collectors' Edition back (gold border)",
+      "source": "https://mtg.wiki/page/Collectors%27_Edition"
+    },
+    "cei": {
+      "symbol": false,
+      "back": "International Edition back (gold border)",
+      "source": "https://mtg.wiki/page/Collectors%27_Edition"
+    },
+    "fbb": {
+      "symbol": false,
+      "source": "https://mtg.wiki/page/Foreign_Black_Border"
+    },
+    "4ed": {
+      "symbol": false,
+      "source": "https://mtg.wiki/page/Expansion_symbol"
+    },
+    "4bb": {
+      "symbol": false,
+      "source": "https://mtg.wiki/page/Expansion_symbol"
+    },
+    "5ed": {
+      "symbol": false,
+      "except_langs": [
+        "zhs"
+      ],
+      "source": "https://mtg.wiki/page/Fifth_Edition"
+    },
+    "30a": {
+      "back": "30th Anniversary back (gold border, Black Lotus)",
+      "source": "https://mtg.wiki/page/30th_Anniversary_Edition"
+    },
+    "wc97": {
+      "back": "World Championship deck back",
+      "source": "https://mtg.wiki/page/World_Championship_Decks"
+    },
+    "wc98": {
+      "back": "World Championship deck back",
+      "source": "https://mtg.wiki/page/World_Championship_Decks"
+    },
+    "wc99": {
+      "back": "World Championship deck back",
+      "source": "https://mtg.wiki/page/World_Championship_Decks"
+    },
+    "wc00": {
+      "back": "World Championship deck back",
+      "source": "https://mtg.wiki/page/World_Championship_Decks"
+    },
+    "wc01": {
+      "back": "World Championship deck back",
+      "source": "https://mtg.wiki/page/World_Championship_Decks"
+    },
+    "wc02": {
+      "back": "World Championship deck back",
+      "source": "https://mtg.wiki/page/World_Championship_Decks"
+    },
+    "wc03": {
+      "back": "World Championship deck back",
+      "source": "https://mtg.wiki/page/World_Championship_Decks"
+    },
+    "wc04": {
+      "back": "World Championship deck back",
+      "source": "https://mtg.wiki/page/World_Championship_Decks"
+    },
+    "ptc": {
+      "back": "Pro Tour logo back",
+      "source": "https://mtg.wiki/page/Pro_Tour_Collector_Set"
+    },
+    "dbl": {
+      "foil": "silver screen foil",
+      "source": "https://mtg.wiki/page/Innistrad:_Double_Feature"
+    },
+    "plst": {
+      "stamp": "List stamp (lower left)",
+      "source": "https://mtg.wiki/page/The_List"
+    },
+    "ulst": {
+      "stamp": "List stamp (lower left)",
+      "source": "https://magic.wizards.com/en/news/feature/list-unfinity-un-usual-twist-list-2022-09-20"
+    }
+  },
+  "pairs": [
+    {
+      "sets": [
+        "lea",
+        "leb"
+      ],
+      "notes": {
+        "lea": "Alpha's corners are more rounded than Beta's.",
+        "leb": "Beta's corners are less rounded than Alpha's."
+      },
+      "source": "https://mtg.wiki/page/Limited_Edition"
+    }
+  ]
+}
