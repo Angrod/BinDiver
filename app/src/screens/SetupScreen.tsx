@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, AppState, Button, StyleSheet, Text, View } from 'react-native';
-import { useAppData } from '../app/AppData';
+import { useAppData } from '../state/AppData';
 import { currentNetwork } from '../data/network';
 import type { NetworkKind } from '../data/policy';
 

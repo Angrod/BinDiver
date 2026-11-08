@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button, SafeAreaView, StyleSheet, Text } from 'react-native';
-import { useAppData } from '../app/AppData';
+import { useAppData } from '../state/AppData';
+import type { CardGroup } from '../game/mtg/types';
 import type { CardMatch } from '../game/types';
 import { SearchSheet } from './SearchSheet';
 
@@ -12,14 +13,21 @@ export function HomeScreen() {
 
   const onPick = (m: CardMatch) => {
     setOpen(false);
-    const groups = game?.lookup(m.oracleIds, 1000, 'oldest') ?? [];
+    let groups: CardGroup[] = [];
+    try {
+      groups = game?.lookup(m.oracleIds, 1000, 'oldest') ?? [];
+    } catch (e) {
+      console.warn('lookup failed', e);
+      return;
+    }
     setPicked({ name: m.name, versions: groups.reduce((n, g) => n + g.qualifying.length, 0) });
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <Text style={styles.date}>Prices as of {priceDate ?? 'unknown'}</Text>
-      <Button title="Search" onPress={() => setOpen(true)} />
+      {game === null && <Text style={styles.date}>Loading cards…</Text>}
+      <Button title="Search" onPress={() => setOpen(true)} disabled={game === null} />
       {picked && (
         <>
           <Text style={styles.name}>{picked.name}</Text>

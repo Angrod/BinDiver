@@ -50,6 +50,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState('');
 
   const closeLive = useCallback(() => {
+    // Drop the game first so no screen calls into a closed handle.
+    setGame(null);
     const db = liveRef.current;
     liveRef.current = null;
     db?.close();

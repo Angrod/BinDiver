@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import {
   Button, Modal, Pressable, SafeAreaView, StyleSheet, Text, TextInput, View,
 } from 'react-native';
-import { useAppData } from '../app/AppData';
+import { useAppData } from '../state/AppData';
 import type { CardMatch } from '../game/types';
 
 interface Props {
@@ -16,13 +16,23 @@ export function SearchSheet({ visible, onPick, onCancel }: Props) {
   const [text, setText] = useState('');
   const [notFound, setNotFound] = useState(false);
 
-  const suggestions = useMemo(
-    () => (game && text.trim() !== '' ? game.suggest(text, 6) : []),
-    [game, text],
-  );
+  const suggestions = useMemo(() => {
+    if (!game || text.trim() === '') return [];
+    try {
+      return game.suggest(text, 6);
+    } catch (e) {
+      console.warn('suggest failed', e);
+      return [];
+    }
+  }, [game, text]);
 
   const pick = (name: string) => {
-    const match = game?.find(name) ?? null;
+    let match: CardMatch | null = null;
+    try {
+      match = game?.find(name) ?? null;
+    } catch (e) {
+      console.warn('find failed', e);
+    }
     if (!match) {
       setNotFound(true);
       return;
