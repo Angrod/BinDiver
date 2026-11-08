@@ -267,8 +267,9 @@ A kept version that later disappears from the data is ignored. `marked_at` and `
 **Nothing leaves the phone.** There are no accounts and no analytics. The only network traffic is:
 - the manifest and database download from GitHub
 - the app's check with Expo's update server for a newer version of its own code (EAS Update)
+- Google ML Kit's own traffic: it sends Google metrics about how its text reader performs and is used, and it fetches model updates. Matt accepted this on 2026-11-08 rather than switch to Apple's text reader.
 
-Neither carries Matt's data.
+None of these carries Matt's data. ML Kit reads the camera frames on the phone and doesn't send them or the text it reads.
 
 ## 5. When things go wrong
 
