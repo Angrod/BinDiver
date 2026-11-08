@@ -59,6 +59,15 @@
     ],
     "runtimeVersion": {
       "policy": "fingerprint"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "4e0fa4bd-3538-4405-8de8-641d28a7e039"
+      }
+    },
+    "owner": "apogeeappdev",
+    "updates": {
+      "url": "https://u.expo.dev/4e0fa4bd-3538-4405-8de8-641d28a7e039"
     }
   }
 }
