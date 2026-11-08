@@ -52,3 +52,16 @@ test('prefix matches by length then name', () => {
     'fireball', 'firebolt', 'fireblast', 'firebending', 'firebreathing', 'fireborn knight',
   ]);
 });
+
+// Known risk, kept for gate tuning (no matcher change): some rules-text keywords are exact card names,
+// so a rules line read inside the title band matches that card. "Flashback {2}{R}" loses its mana word
+// and still lands on Flashback. This pins today's behaviour; revisit if the gate shows such reads.
+test('known risk: rules-text keywords that are card names match as titles', () => {
+  for (const [line, norm] of [['Flash', 'flash'], ['Flashback {2}{R}', 'flashback'], ['Landfall', 'landfall']]) {
+    expect([line, matchLine(index, line)]).toEqual([line, expect.objectContaining({ norm, kind: 'exact' })]);
+  }
+});
+
+test('a title row joined with its mana-cost line still matches the title', () => {
+  expect(matchLine(index, 'Fireball XR')).toMatchObject({ norm: 'fireball', kind: 'exact' });
+});
