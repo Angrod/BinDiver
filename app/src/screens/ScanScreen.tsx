@@ -100,7 +100,6 @@ export function ScanScreen() {
   const record = useCallback(
     (m: CardMatch, source: 'camera' | 'search', rawText: string, versions: number) => {
       const r = runRef.current;
-      if (source === 'search' && r === null) return; // typed searches are only logged during a run
       user.recordScan({
         at: new Date().toISOString(),
         runId: r?.id ?? null,
@@ -190,6 +189,9 @@ export function ScanScreen() {
     const id = user.startRun(stackCount, at);
     setRun({ id, startedAt: at, stoppedAt: null, stackCount });
     setRunCount(0);
+    // A fresh streak, so the card under the camera can commit into the run even if it was read just before.
+    tracker.current = new CommitTracker();
+    setShown(null);
     setRunOpen(false);
   };
   const stopRun = () => {
