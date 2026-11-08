@@ -1,21 +1,48 @@
 import type { Scan, TestRun } from './store';
 
 export interface RunSummary {
-  cardsRead: number; rightReads: number; readRate: number | null; avgSecondsPerCard: number | null;
+  cardsRead: number;
+  /** Camera scans not marked wrong. */
+  rightReads: number;
+  /** Camera scans marked wrong. */
+  wrongReads: number;
+  /** Stack cards with no right read: max(0, stackCount − rightReads), 0 for an empty stack. */
+  missed: number;
+  readRate: number | null;
+  /**
+   * The mean gap between consecutive right camera reads, skipping any gap with a search scan in it;
+   * null when there is no such gap.
+   */
+  avgSecondsPerCard: number | null;
 }
 
 export function summarizeRun(run: TestRun, scans: Scan[]): RunSummary {
-  const rightReads = scans.filter((s) => s.source === 'camera' && !s.markedWrong).length;
-  let avg: number | null = null;
-  if (scans.length >= 2) {
-    const span = Date.parse(scans[scans.length - 1].at) - Date.parse(scans[0].at);
-    avg = span / 1000 / (scans.length - 1);
-  }
+  const isRight = (s: Scan) => s.source === 'camera' && !s.markedWrong;
+  const rightReads = scans.filter(isRight).length;
+  const wrongReads = scans.filter((s) => s.source === 'camera' && s.markedWrong).length;
+
+  let total = 0;
+  let gaps = 0;
+  let prev = -1; // index of the previous right read
+  let searchSincePrev = false;
+  scans.forEach((s, i) => {
+    if (s.source === 'search') searchSincePrev = true;
+    if (!isRight(s)) return;
+    if (prev >= 0 && !searchSincePrev) {
+      total += Date.parse(s.at) - Date.parse(scans[prev].at);
+      gaps += 1;
+    }
+    prev = i;
+    searchSincePrev = false;
+  });
+
   return {
     cardsRead: scans.length,
     rightReads,
+    wrongReads,
+    missed: run.stackCount === 0 ? 0 : Math.max(0, run.stackCount - rightReads),
     readRate: run.stackCount === 0 ? null : rightReads / run.stackCount,
-    avgSecondsPerCard: avg,
+    avgSecondsPerCard: gaps === 0 ? null : total / 1000 / gaps,
   };
 }
 

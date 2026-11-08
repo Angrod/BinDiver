@@ -88,6 +88,8 @@ export function RunScreen({ visible, onStart, onClose }: Props) {
           <Text style={styles.section}>Last run</Text>
           <Row label="Cards read" value={String(summary.cardsRead)} />
           <Row label="Read right" value={formatReadRight(summary.readRate, summary.rightReads, last.stackCount)} />
+          <Row label="Wrong" value={String(summary.wrongReads)} />
+          <Row label="Missed" value={String(summary.missed)} />
           <Row label="Seconds per card" value={formatSecondsPerCard(summary.avgSecondsPerCard)} />
           <View style={styles.export}>
             <Button title="Export" onPress={() => void exportRun()} disabled={exporting} />

@@ -15,13 +15,30 @@ const scans = [
 
 describe('summarizeRun', () => {
   it('summarizes', () => {
+    // The only right-to-right interval (0 -> 9 s) contains the search, so there is no average.
     expect(summarizeRun(run(3), scans)).toEqual({
-      cardsRead: 4, rightReads: 2, readRate: 2 / 3, avgSecondsPerCard: 3,
+      cardsRead: 4, rightReads: 2, wrongReads: 1, missed: 1, readRate: 2 / 3, avgSecondsPerCard: null,
     });
   });
-  it('null rate with zero stack, null average with under 2 scans', () => {
+  it('averages the gaps between consecutive right camera reads', () => {
+    expect(summarizeRun(run(2), [mk(1, 0), mk(2, 2.5)]).avgSecondsPerCard).toBe(2.5);
+  });
+  it('skips wrong reads and any gap with a search in it', () => {
+    const list = [
+      mk(1, 0), mk(2, 1, { markedWrong: true }), mk(3, 3), // 0 -> 3: the wrong read is not a card
+      mk(4, 4, { source: 'search' }), mk(5, 10), //            3 -> 10: contains a search, skipped
+      mk(6, 15), //                                           10 -> 15
+    ];
+    expect(summarizeRun(run(10), list).avgSecondsPerCard).toBe(4);
+  });
+  it('counts no misses past the stack and none with a zero stack', () => {
+    expect(summarizeRun(run(1), scans).missed).toBe(0);
+    expect(summarizeRun(run(0), scans).missed).toBe(0);
+  });
+  it('null rate with zero stack, null average with under 2 right camera reads', () => {
     expect(summarizeRun(run(0), scans).readRate).toBeNull();
     expect(summarizeRun(run(3), [mk(1, 0)]).avgSecondsPerCard).toBeNull();
+    expect(summarizeRun(run(3), [mk(1, 0), mk(2, 3, { markedWrong: true })]).avgSecondsPerCard).toBeNull();
   });
 });
 
