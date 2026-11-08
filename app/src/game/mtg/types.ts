@@ -24,5 +24,6 @@ export interface CardGroup {
   qualifying: Version[];
   unpriced: Version[];
   totalVersions: number;
+  summary: string;
   versionsByKey: Map<string, Version>;
 }

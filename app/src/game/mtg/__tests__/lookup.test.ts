@@ -20,11 +20,10 @@ test.each(cases)('$query at $min_cents ($order)', (c) => {
   expect(resolved.match).toBe(c.match);
   const keys = (vs: Version[]) => vs.map((x) => x.key);
   const got = lookupGroups(db, resolved.oracleIds, c.min_cents, c.order).map((g) => ({
-    oracle_id: g.oracleId, name: g.name, total_versions: g.totalVersions,
+    oracle_id: g.oracleId, name: g.name, total_versions: g.totalVersions, summary: g.summary,
     qualifying: keys(g.qualifying), unpriced: keys(g.unpriced),
   }));
-  const want = c.groups.map(({ summary: _s, ...rest }) => rest);
-  expect(got).toEqual(want);
+  expect(got).toEqual(c.groups);
 });
 
 test('cardName falls back sensibly', () => {

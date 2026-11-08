@@ -1,5 +1,6 @@
 import type { Db } from '../../db/types';
 import { sortVersions } from './sort';
+import { summarize } from './summary';
 import type { CardGroup, NameKind, SortOrder, Version } from './types';
 
 export function resolveExact(
@@ -78,6 +79,7 @@ export function lookupGroups(db: Db, oracleIds: string[], minCents: number, orde
         versions.filter((v) => v.priceCents !== null && v.priceCents >= minCents), order),
       unpriced: sortVersions(versions.filter((v) => v.priceCents === null), order),
       totalVersions: versions.length,
+      summary: summarize(versions, minCents),
       versionsByKey: new Map(versions.map((v) => [v.key, v])),
     };
   });
