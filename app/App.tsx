@@ -1,12 +1,12 @@
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View } from 'react-native';
 import { AppDataProvider, useAppData } from './src/state/AppData';
-import { HomeScreen } from './src/screens/HomeScreen';
+import { ScanScreen } from './src/screens/ScanScreen';
 import { SetupScreen } from './src/screens/SetupScreen';
 
 function Root() {
   const { phase, status } = useAppData();
-  if (phase === 'ready') return <HomeScreen />;
+  if (phase === 'ready') return <ScanScreen />;
   if (phase === 'setup') return <SetupScreen />;
   return (
     <View style={styles.center}>
