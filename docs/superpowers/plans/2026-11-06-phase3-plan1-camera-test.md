@@ -1138,7 +1138,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - [ ] **Step 1: Build fresh data and ask before publishing**
 
 Run: `.venv/bin/python -m bindiver update && .venv/bin/python -m bindiver phone-db`
-Then ask Matt: "Publish the card database as a public download on `Angrod/BinDiver`?" Wait for yes.
+Then ask Matt: "Make `Angrod/BinDiver` public and publish the card database as a public download?" Wait for yes. The repo was created private (ledger, Task 1); the phone downloads release assets without a token, so they only work once the repo is public: `gh repo edit Angrod/BinDiver --visibility public --accept-visibility-change-consequences`.
 
 - [ ] **Step 2: Publish it**
 
@@ -1182,10 +1182,12 @@ Run (in `app/`): `npx eas-cli@27 init --non-interactive --force && npx expo inst
   2. "Prices as of <date>" appears.
   3. Searching "fireb" suggests Fireball.
   4. The camera view shows the outline.
-  5. The frame line reads `Frame 1080×1920` or `Frame 1920×1080`.
-  6. A held-up Fireball commits with a tick.
+  5. The frame line reads exactly `Frame 1080×1920`. Anything else means the crop is wrong.
+  6. A held-up Fireball commits with a tick, and the grey debug line shows what was read.
+  7. The title is sharp when the card fills the outline (2× zoom, `CAMERA_ZOOM_X`).
+  8. Reads still work with the phone tilted sideways.
 
-- [ ] **Step 8: Android.** Matt runs `npx eas-cli@27 build --profile preview --platform android` and installs the APK from the build page on his Android phone. He repeats Step 7 there.
+- [ ] **Step 8: Android.** Matt runs `npx eas-cli@27 build --profile preview --platform android` and installs the APK from the build page on his Android phone. He repeats Step 7 there. Known risk before the Android gate: the 2× zoom is probably lost when the camera stops and restarts (every sheet open/close). Re-apply zoom when the camera starts and show the zoom in the debug line; this is JavaScript-only and ships with `eas update`.
 
 - [ ] **Step 9: Commit**
 
@@ -1209,11 +1211,12 @@ JavaScript-only fixes from here on ship with `npx eas-cli@27 update --channel pr
 - [ ] **Step 1: Matt runs the test** on his iPhone, in good light at home:
   - **The stack:** 50 mixed cards, including old border, showcase, borderless, full-art, foil and sleeved cards, plus 2 or 3 foreign cards that he types.
   - **Starting:** enter the number of English cards, then Start.
-  - **Scanning:** slide each card onto the last, and type each foreign card's English name with Search.
+  - **Scanning:** slide each card onto the last, coming in from below or from the side (not down from the top, which drags rules text through the title band), and type each foreign card's English name with Search.
+  - **Order:** no two cards with the same name next to each other; the commit rule never commits the same card twice in a row.
   - **Finishing:** Stop, mark any wrong reads, then Export and send the CSV.
   - **Android:** the same test on his Android phone, if its build works. The iPhone result decides the gate.
 
-- [ ] **Step 2: Analyse the CSV.** Count the reads, wrong reads, misses (English cards minus right reads) and seconds per card. List every tolerant match with its `raw_text` and `line_used`.
+- [ ] **Step 2: Analyse the CSV.** Count the reads, wrong reads, misses (English cards minus right reads) and seconds per card, timed only between consecutive right camera reads with no typed search between them (as the app's summary does). Also read the exported unmatched-lines CSV. List every tolerant match with its `raw_text` and `line_used`.
 
 - [ ] **Step 3: Add real misreads.** For every wrong or tolerant read whose right card is known, append `[raw_text, right name]` to `misreads.json`. Run `npm test`. If one fails, fix `match.ts` (it must still pass every older case), and ship the fix with `eas update`.
 
