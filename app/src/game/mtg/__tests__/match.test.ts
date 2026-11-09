@@ -85,6 +85,10 @@ const OLD_FRAME_GARBLES: Array<[string, string]> = [
   ['drougr', 'Drought'],
   ['cirele ofprorectí9n blcks 1', 'Circle of Protection: Black'],
   ['circl of9rorectíoth whíre 1', 'Circle of Protection: White'],
+  // Runs 2 and 3 (Nov 9): run 3 committed the first; the other two were unmatched in run 2.
+  ['ballisca guad', 'Ballista Squad'],
+  ['ballisca yguad', 'Ballista Squad'],
+  ['radants drag903', "Radiant's Dragoons"],
 ];
 
 test('a loose camera match finds badly garbled old-frame titles the default misses', () => {
