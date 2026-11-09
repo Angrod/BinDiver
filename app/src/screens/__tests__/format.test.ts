@@ -38,7 +38,10 @@ describe('formatSecondsPerCard', () => {
 
 describe('labels', () => {
   it('formats the frame size', () => {
-    expect(formatFrameSize({ width: 1080, height: 1920 })).toBe('Frame 1080×1920');
+    expect(formatFrameSize({ width: 1080, height: 1920 }, 9 / 16)).toBe('Frame 1080×1920');
+    expect(formatFrameSize({ width: 1440, height: 1920 }, 3 / 4)).toBe('Frame 1440×1920');
+    // A frame whose shape isn't the preview's reads somewhere other than the orange strip.
+    expect(formatFrameSize({ width: 1080, height: 1920 }, 3 / 4)).toBe('Frame 1080×1920 · not the preview’s shape');
   });
   it('counts versions', () => {
     expect(versionsLine(0)).toBe('0 versions at $10+');

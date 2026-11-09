@@ -35,6 +35,10 @@ test('matchTitleLoose takes a read matchTitle misses', () => {
   expect(game.matchTitle('Cqunterspeii')).toBeNull();
   expect(game.matchTitleLoose('Cqunterspeii')).toMatchObject({ name: 'Counterspell', match: 'loose' });
 });
+test('isFooterText spots the copyright line', () => {
+  expect(game.isFooterText('™ & © 2026 Wizards of the Coast')).toBe(true);
+  expect(game.isFooterText('Fireball')).toBe(false);
+});
 test('find', () => {
   expect(game.find('fire // ice')).toMatchObject({ name: 'Fire // Ice', match: 'typed' });
   expect(game.find('Shu Jing Meteorite')).toBeNull();

@@ -24,8 +24,10 @@ export function formatSecondsPerCard(seconds: number | null): string {
   return seconds === null ? DASH : seconds.toFixed(1);
 }
 
-export function formatFrameSize(size: Size): string {
-  return `Frame ${size.width}×${size.height}`;
+/** The frame size, flagged when its shape isn't the expected one (the preview's), so the strip isn't what is read. */
+export function formatFrameSize(size: Size, aspect: number): string {
+  const shapeOk = Math.abs(size.width / size.height - aspect) < 0.01;
+  return `Frame ${size.width}×${size.height}${shapeOk ? '' : ' · not the preview’s shape'}`;
 }
 
 /** The live debug line: the last candidate text read and the card it matched, or none. */

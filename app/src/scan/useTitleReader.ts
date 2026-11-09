@@ -7,7 +7,7 @@ import {
   useTextRecognition, type Text, type TextRecognitionOptions,
 } from 'react-native-vision-camera-ocr-plus';
 import { createSynchronizable, scheduleOnRN } from 'react-native-worklets';
-import type { PercentRegion, Size } from './geometry';
+import { frameShape, type PercentRegion, type Size } from './geometry';
 import { linesFromText, type OcrLine } from './lines';
 import {
   displayFrameSize, frameMsPerUnit, READ_INTERVAL_MS, readDue, type RawFrameSize,
@@ -15,6 +15,9 @@ import {
 
 /** OCR starts on every 6th frame; the frames between return the last finished result. */
 const FRAME_SKIP = 6;
+
+/** The frames' resolution, in the camera preview's shape on this platform. */
+const FRAME_RESOLUTION = CommonResolutions[frameShape(Platform.OS).resolution];
 
 /** Converts Frame.timestamp to milliseconds on this platform. */
 const FRAME_MS = frameMsPerUnit(Platform.OS);
@@ -114,7 +117,7 @@ export function useTitleReader({ region, active, onText }: TitleReaderOptions): 
 
   const frameOutput = useFrameOutput({
     pixelFormat: 'rgb',
-    targetResolution: CommonResolutions.FHD_16_9,
+    targetResolution: FRAME_RESOLUTION,
     onFrame,
     onFrameDropped,
   });

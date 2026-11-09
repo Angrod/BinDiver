@@ -1,8 +1,10 @@
 import type { CardGroup } from '../../game/mtg/types';
 import type { CardMatch } from '../../game/types';
 import {
-  commitKey, displayFrameSize, frameMsPerUnit, matchCandidates, qualifyingVersions, readDue, READ_INTERVAL_MS,
+  commitKey, displayFrameSize, frameCandidates, frameMsPerUnit, matchCandidates, qualifyingVersions, readDue,
+  READ_INTERVAL_MS,
 } from '../reading';
+import type { OcrLine } from '../lines';
 
 const match = (over: Partial<CardMatch>): CardMatch => ({
   oracleIds: [], name: '', match: 'exact', isToken: false, lineUsed: '', ...over,
@@ -101,5 +103,18 @@ describe('matchCandidates', () => {
     });
     expect(looseCalls).toEqual(['junk', 'more junk']);
     warn.mockRestore();
+  });
+});
+
+describe('frameCandidates', () => {
+  const footerGame = { isFooterText: (line: string) => line.includes('Coast') };
+  const line = (text: string, y: number): OcrLine => ({ text, x: 10, y, width: 100, height: 10 });
+
+  test("a frame's top row, as titleCandidates gives it", () => {
+    expect(frameCandidates(footerGame, [line('Fireball', 5), line('Sorcery', 40)])).toEqual(['Fireball']);
+  });
+  test('nothing when any line is the footer: the strip is over the bottom of a card', () => {
+    // iPhone run 5: "Ninja" from a type line, read with the P/T and the copyright line below it.
+    expect(frameCandidates(footerGame, [line('Ninja', 5), line('2/3', 20), line('of the Coast', 30)])).toEqual([]);
   });
 });

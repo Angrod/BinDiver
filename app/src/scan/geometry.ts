@@ -10,7 +10,18 @@ export const OUTLINE_SHARE = 0.88; // outline fits within 88% of the view in bot
 export const BAND_TOP = -0.02;
 export const BAND_HEIGHT = 0.22;
 export const BAND_SIDE = 0.04;
-export const FRAME_ASPECT = 9 / 16; // display-oriented frame (CommonResolutions.FHD_16_9)
+
+/** The frame output's resolution (a VisionCamera CommonResolutions key) and its display-oriented width / height. */
+export interface FrameShape { resolution: 'FHD_16_9' | 'FHD_4_3'; aspect: number }
+
+/**
+ * The frame output's shape, matched to the camera preview's so the orange strip is the area read.
+ * iOS gives the preview and the frames one format. Android's CameraX sizes the preview on its own, at 4:3
+ * by default (VisionCamera 5.2 sets no preview resolution), so the frames are asked for at 4:3 there too.
+ */
+export function frameShape(os: string): FrameShape {
+  return os === 'android' ? { resolution: 'FHD_4_3', aspect: 3 / 4 } : { resolution: 'FHD_16_9', aspect: 9 / 16 };
+}
 /**
  * Field of view relative to the main camera; tune at the gate.
  * At 1× a card filling the outline sits about 13–14 cm away, likely closer than the main camera can focus.
@@ -52,6 +63,14 @@ export function zoomToApply(actual: number, target: number, maxZoom: number): nu
   return Math.abs(actual - want) > ZOOM_TOLERANCE ? want : null;
 }
 
+/**
+ * Whether a camera error is Android's refusal to zoom before the camera is active: VisionCamera sets the
+ * zoom prop as soon as the camera is created, and the scan screen sets it again once the camera starts.
+ */
+export function isEarlyZoomError(message: string): boolean {
+  return message.includes('OperationCanceledException') && message.includes('Camera is not active');
+}
+
 /** The card-shaped outline, centred in the view. */
 export function cardOutline(view: Size): Rect {
   const height = Math.min(OUTLINE_SHARE * view.height, (OUTLINE_SHARE * view.width) / CARD_ASPECT);
@@ -72,7 +91,7 @@ export function titleBand(outline: Rect): Rect {
 const pct = (n: number): Percent => `${(n * 100).toFixed(2)}%` as Percent;
 
 /** Convert a rectangle in view points to a percentage region of the camera frame, undoing resizeMode 'cover'. */
-export function viewRectToFrameRegion(rect: Rect, view: Size, frameAspect: number = FRAME_ASPECT): PercentRegion {
+export function viewRectToFrameRegion(rect: Rect, view: Size, frameAspect: number): PercentRegion {
   let frameW: number;
   let frameH: number;
   if (view.width / view.height > frameAspect) {

@@ -2,7 +2,7 @@ import { setAudioModeAsync, useAudioPlayer } from 'expo-audio';
 import { useKeepAwake } from 'expo-keep-awake';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  AppState, Button, LayoutChangeEvent, Linking, Pressable, StyleSheet, Text, View,
+  AppState, Button, LayoutChangeEvent, Linking, Platform, Pressable, StyleSheet, Text, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Camera, useCameraDevice, useCameraPermission, type CameraRef } from 'react-native-vision-camera';
@@ -10,10 +10,11 @@ import { isStale } from '../data/policy';
 import type { CardMatch } from '../game/types';
 import { CommitTracker } from '../scan/commit';
 import {
-  cameraZoom, cardOutline, titleBand, viewRectToFrameRegion, zoomToApply, type Rect, type Size,
+  cameraZoom, cardOutline, frameShape, isEarlyZoomError, titleBand, viewRectToFrameRegion, zoomToApply,
+  type Rect, type Size,
 } from '../scan/geometry';
-import { titleCandidates, type OcrLine } from '../scan/lines';
-import { commitKey, matchCandidates, qualifyingVersions } from '../scan/reading';
+import type { OcrLine } from '../scan/lines';
+import { commitKey, frameCandidates, matchCandidates, qualifyingVersions } from '../scan/reading';
 import { ReadTimer } from '../scan/readTimer';
 import { normalizeLine, UnmatchedLines, type UnmatchedRow } from '../scan/unmatched';
 import { useTitleReader } from '../scan/useTitleReader';
@@ -28,6 +29,8 @@ const MIN_CENTS = 1000; // $10
 const DIAGNOSTICS_MS = 500; // the debug line and counters re-render at most this often
 const BAND = '#ff9f43';
 const AMBER = '#e5a50a';
+/** The camera frames' shape on this platform: the preview's, so the title strip is the area read. */
+const FRAME_ASPECT = frameShape(Platform.OS).aspect;
 
 /** What the bottom of the screen shows for the last card read or picked. */
 interface Shown {
@@ -94,7 +97,8 @@ export function ScanScreen() {
   const appActive = useAppActive();
   const onCameraError = useCallback((e: Error) => {
     console.warn('camera error', e);
-    setCameraError(e.message);
+    // Android refuses the zoom prop until the camera is active; onCameraStarted sets the zoom again.
+    if (!isEarlyZoomError(e.message)) setCameraError(e.message);
   }, []);
   // Android's camera drops back to 1x each time it stops and starts (a sheet opening or closing, the app
   // going to the background), and the zoom given when the camera is created can land before it is open.
@@ -131,7 +135,7 @@ export function ScanScreen() {
     if (!viewSize) return null;
     const outline = cardOutline(viewSize);
     const band = titleBand(outline);
-    return { outline, band, region: viewRectToFrameRegion(band, viewSize) };
+    return { outline, band, region: viewRectToFrameRegion(band, viewSize, FRAME_ASPECT) };
   }, [viewSize]);
 
   // The camera (and with it the reader) is off while the Search or Run sheet is open,
@@ -198,8 +202,9 @@ export function ScanScreen() {
       }
       const g = gameRef.current;
       if (!g) return; // cards are loading or being swapped: skip the frame
-      // The top row joined, then each of its lines alone: strict matches first, then loose ones.
-      const candidates = titleCandidates(lines);
+      // The top row joined, then each of its lines alone: strict matches first, then loose ones. None when
+      // the strip sees a card's footer, which counts as no title in view.
+      const candidates = frameCandidates(g, lines);
       const started = performance.now();
       const { match, matchedText, noMatch } = matchCandidates(g, candidates);
       if (candidates.length > 0) {
@@ -351,7 +356,7 @@ export function ScanScreen() {
 
       <View style={styles.bottom}>
         <Text style={styles.hint}>{paused ? 'Tap to resume' : 'Tap to pause'}</Text>
-        {frameSize && <Text style={styles.grey}>{formatFrameSize(frameSize)}</Text>}
+        {frameSize && <Text style={styles.grey}>{formatFrameSize(frameSize, FRAME_ASPECT)}</Text>}
         {diag.lastRead !== null && <Text style={styles.debug} numberOfLines={1}>{diag.lastRead}</Text>}
         <Text style={styles.debug}>{diag.counters}</Text>
         <Text style={styles.debug}>{updateStatus}</Text>

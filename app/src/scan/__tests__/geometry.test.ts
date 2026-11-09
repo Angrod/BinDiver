@@ -1,4 +1,8 @@
-import { CAMERA_ZOOM_X, cameraZoom, cardOutline, titleBand, viewRectToFrameRegion, zoomToApply } from '../geometry';
+import {
+  CAMERA_ZOOM_X, cameraZoom, cardOutline, frameShape, isEarlyZoomError, titleBand, viewRectToFrameRegion, zoomToApply,
+} from '../geometry';
+
+const IOS = frameShape('ios').aspect;
 
 function expectRect(actual: { x: number; y: number; width: number; height: number }, e: { x: number; y: number; width: number; height: number }) {
   expect(actual.x).toBeCloseTo(e.x, 4);
@@ -37,22 +41,59 @@ describe('titleBand', () => {
 describe('viewRectToFrameRegion', () => {
   it('maps the full view when the frame is cropped top and bottom', () => {
     const view = { width: 390, height: 380 };
-    expect(viewRectToFrameRegion({ x: 0, y: 0, ...view }, view)).toEqual({
+    expect(viewRectToFrameRegion({ x: 0, y: 0, ...view }, view, IOS)).toEqual({
       left: '0.00%', top: '22.60%', width: '100.00%', height: '54.81%',
     });
   });
   it('maps the title band', () => {
     const view = { width: 390, height: 380 };
     const band = titleBand(cardOutline(view));
-    expect(viewRectToFrameRegion(band, view)).toEqual({
+    expect(viewRectToFrameRegion(band, view, IOS)).toEqual({
       left: '16.85%', top: '24.92%', width: '66.30%', height: '10.61%',
     });
   });
   it('maps when the frame is cropped left and right', () => {
     const view = { width: 300, height: 600 };
-    expect(viewRectToFrameRegion({ x: 0, y: 0, ...view }, view)).toEqual({
+    expect(viewRectToFrameRegion({ x: 0, y: 0, ...view }, view, IOS)).toEqual({
       left: '5.56%', top: '0.00%', width: '88.89%', height: '100.00%',
     });
+  });
+});
+
+// Android run 1 (Pixel 8, Nov 9): CameraX gave the preview 1600x1200 (4:3) and the frames 1920x1080 (16:9),
+// so the reader saw only the middle three quarters of the preview's width and read 11-27% down the outline:
+// below a lined-up card's title. Frames now take the preview's shape on each platform.
+describe('frameShape', () => {
+  it('keeps iOS at 16:9, where the preview and the frames share one format', () => {
+    expect(frameShape('ios')).toEqual({ resolution: 'FHD_16_9', aspect: 9 / 16 });
+  });
+  it("asks for 4:3 frames on Android, the shape of CameraX's default preview", () => {
+    expect(frameShape('android')).toEqual({ resolution: 'FHD_4_3', aspect: 3 / 4 });
+  });
+  it('maps the title band on a Pixel-shaped view to the band itself, since the frame fills the preview', () => {
+    const view = { width: 412, height: 397.5 };
+    const band = titleBand(cardOutline(view));
+    const frameH = view.width / frameShape('android').aspect;
+    expect(viewRectToFrameRegion(band, view, frameShape('android').aspect)).toEqual({
+      left: `${((band.x / view.width) * 100).toFixed(2)}%`,
+      top: `${(((band.y + (frameH - view.height) / 2) / frameH) * 100).toFixed(2)}%`,
+      width: `${((band.width / view.width) * 100).toFixed(2)}%`,
+      height: `${((band.height / frameH) * 100).toFixed(2)}%`,
+    });
+  });
+});
+
+describe('isEarlyZoomError', () => {
+  // Android: VisionCamera sets the zoom prop before the camera is active; checkZoom sets it again on start.
+  it("spots CameraX's zoom refusal before the camera is active", () => {
+    expect(isEarlyZoomError(
+      'androidx.camera.core.CameraControl$OperationCanceledException: Camera is not active.\n\tat androidx.camera.camera2.impl.ZoomControl.applyZoomState(ZoomControl.kt:160)',
+    )).toBe(true);
+  });
+  it('leaves every other camera error on screen', () => {
+    for (const m of ['Camera is not active.', 'session/camera-has-been-disconnected', 'device/camera-in-use-by-other-app']) {
+      expect([m, isEarlyZoomError(m)]).toEqual([m, false]);
+    }
   });
 });
 

@@ -1,6 +1,7 @@
 import type { CardGroup } from '../game/mtg/types';
 import type { CardMatch, Game } from '../game/types';
 import type { Size } from './geometry';
+import { titleCandidates, type OcrLine } from './lines';
 
 /**
  * At most one read every 200 ms (about 5 a second).
@@ -82,4 +83,12 @@ export function matchCandidates(
     }
   }
   return { match: null, matchedText: '', noMatch: candidates.filter((c) => !failed.has(c)) };
+}
+
+/**
+ * A frame's title candidates (see titleCandidates), or none when any of its lines is the card's footer:
+ * the strip is then over the bottom of a card, so its top line is a type line or rules text, not a title.
+ */
+export function frameCandidates(game: Pick<Game, 'isFooterText'>, lines: OcrLine[]): string[] {
+  return lines.some((l) => game.isFooterText(l.text)) ? [] : titleCandidates(lines);
 }

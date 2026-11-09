@@ -1,5 +1,6 @@
 import type { Db } from '../../db/types';
 import type { CardMatch, Game } from '../types';
+import { isFooterLine } from './footer';
 import { cardName, lookupGroups, resolveExact } from './lookup';
 import { buildNameIndex, looseLine, matchLine, prefixMatches } from './match';
 import { normalizeName } from './normalize';
@@ -36,6 +37,7 @@ export function createMtgGame(db: Db): Game {
       const m = looseLine(index, line);
       return m ? resolve(m.norm, m.kind, m.lineUsed) : null;
     },
+    isFooterText: isFooterLine,
     find,
     suggest(typed, limit) {
       const names: string[] = [];
