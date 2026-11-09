@@ -47,7 +47,7 @@ export function summarizeRun(run: TestRun, scans: Scan[]): RunSummary {
 }
 
 export const CSV_HEADER =
-  'at,seconds_since_previous,source,raw_text,line_used,name,match,price_date,min_cents,alerted,marked_wrong';
+  'at,seconds_since_previous,seconds_to_read,source,raw_text,line_used,name,match,price_date,min_cents,alerted,marked_wrong';
 
 function field(v: string): string {
   return /[",\n\r]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
@@ -57,7 +57,8 @@ export function runToCsv(scans: Scan[]): string {
   const yn = (b: boolean) => (b ? 'yes' : 'no');
   const lines = scans.map((s, i) => {
     const gap = i === 0 ? '' : ((Date.parse(s.at) - Date.parse(scans[i - 1].at)) / 1000).toFixed(1);
-    return [s.at, gap, s.source, s.rawText, s.lineUsed, s.name, s.match, s.priceDate,
+    const read = s.readMs === null ? '' : (s.readMs / 1000).toFixed(1);
+    return [s.at, gap, read, s.source, s.rawText, s.lineUsed, s.name, s.match, s.priceDate,
       String(s.minCents), yn(s.alerted), yn(s.markedWrong)].map(field).join(',');
   });
   return [CSV_HEADER, ...lines].join('\n') + '\n';

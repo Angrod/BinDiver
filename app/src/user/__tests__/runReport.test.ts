@@ -6,7 +6,7 @@ const at = (s: number) => new Date(T + s * 1000).toISOString();
 const mk = (id: number, sec: number, o: Partial<Scan> = {}): Scan => ({
   id, at: at(sec), runId: 1, oracleIds: ['o'], name: 'Island', source: 'camera',
   rawText: 'Isl', lineUsed: 'Island', match: 'exact', priceDate: '2026-11-04',
-  minCents: 25, alerted: false, markedWrong: false, ...o,
+  minCents: 25, alerted: false, markedWrong: false, readMs: null, ...o,
 });
 const run = (stackCount: number): TestRun => ({ id: 1, startedAt: at(0), stoppedAt: null, stackCount });
 const scans = [
@@ -53,5 +53,11 @@ describe('runToCsv', () => {
     expect(lines[2]).toContain(',yes,no');
     expect(csv.endsWith('\n')).toBe(true);
     expect(lines).toHaveLength(4);
+  });
+  it('gives each read time in seconds after the gap, blank when unknown', () => {
+    expect(CSV_HEADER.startsWith('at,seconds_since_previous,seconds_to_read,source,')).toBe(true);
+    const lines = runToCsv([mk(1, 0, { readMs: 1234 }), mk(2, 3, { source: 'search' })]).split('\n');
+    expect(lines[1].split(',').slice(1, 3)).toEqual(['', '1.2']);
+    expect(lines[2].split(',').slice(1, 3)).toEqual(['3.0', '']);
   });
 });

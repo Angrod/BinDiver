@@ -35,5 +35,13 @@ CREATE TABLE IF NOT EXISTS settings (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
-PRAGMA user_version = 1;
 `;
+
+/** The log's version, kept in SQLite's user_version. USER_SCHEMA creates version 1. */
+export const USER_VERSION = 2;
+
+/** MIGRATIONS[n - 1] takes the log from version n to n + 1. */
+export const MIGRATIONS: string[] = [
+  // 2: how long each camera read took, from the card's first new read to its commit.
+  'ALTER TABLE scans ADD COLUMN read_ms INTEGER;',
+];

@@ -14,6 +14,7 @@ import {
 } from '../scan/geometry';
 import { titleCandidates, type OcrLine } from '../scan/lines';
 import { commitKey, matchCandidates, qualifyingVersions } from '../scan/reading';
+import { ReadTimer } from '../scan/readTimer';
 import { normalizeLine, UnmatchedLines, type UnmatchedRow } from '../scan/unmatched';
 import { useTitleReader } from '../scan/useTitleReader';
 import { useAppData } from '../state/AppData';
@@ -138,7 +139,7 @@ export function ScanScreen() {
 
   // Recording
   const record = useCallback(
-    (m: CardMatch, source: 'camera' | 'search', rawText: string, versions: number) => {
+    (m: CardMatch, source: 'camera' | 'search', rawText: string, versions: number, readMs: number | null) => {
       const r = runRef.current;
       user.recordScan({
         at: new Date().toISOString(),
@@ -152,6 +153,7 @@ export function ScanScreen() {
         priceDate: priceDateRef.current ?? '',
         minCents: MIN_CENTS,
         alerted: versions > 0,
+        readMs,
       });
       if (r !== null) setRunCount((n) => n + 1);
     },
@@ -177,6 +179,7 @@ export function ScanScreen() {
 
   // Camera reads
   const tracker = useRef(new CommitTracker());
+  const readTimer = useRef(new ReadTimer());
   const sawFrame = useRef(false);
   /** The last candidate read and its result, for the debug line; rendered by the diagnostics timer. */
   const lastRead = useRef<string | null>(null);
@@ -206,15 +209,20 @@ export function ScanScreen() {
         if (unmatched.current?.runId !== r.id) unmatched.current = { runId: r.id, lines: new UnmatchedLines() };
         for (const t of noMatch) unmatched.current.lines.add(t);
       }
-      const committed = tracker.current.push(commitKey(match));
+      const key = commitKey(match);
+      const atMs = Date.now();
+      readTimer.current.saw(atMs, matchedText || (candidates[0] ?? ''), key);
+      const committed = tracker.current.push(key);
       if (committed === null || match === null) return;
       const versions = versionsFor(match);
       if (versions === null) {
         // The lookup failed, so this read did not happen: start over so the card can commit again.
         tracker.current = new CommitTracker();
+        readTimer.current.reset();
         return;
       }
-      record(match, 'camera', rawText, versions);
+      const readMs = readTimer.current.committed(atMs, committed, match.name);
+      record(match, 'camera', rawText, versions, readMs);
       playTick();
       show(match, versions);
     },
@@ -243,7 +251,7 @@ export function ScanScreen() {
     setSearchOpen(false);
     const versions = versionsFor(m);
     if (versions === null) return;
-    record(m, 'search', m.name, versions);
+    record(m, 'search', m.name, versions, null);
     show(m, versions);
   };
 
@@ -257,6 +265,7 @@ export function ScanScreen() {
     unmatched.current = { runId: id, lines: new UnmatchedLines() };
     // A fresh streak, so the card under the camera can commit into the run even if it was read just before.
     tracker.current = new CommitTracker();
+    readTimer.current.reset();
     setShown(null);
     setRunOpen(false);
   };
