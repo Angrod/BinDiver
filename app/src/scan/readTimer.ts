@@ -12,21 +12,31 @@ function similarity(a: string, b: string): number {
 
 /**
  * Times how long the reader took on each card: from the first read showing something other than the
- * card just committed (the next card arriving) to that card's commit. Reads of the last card, garbled
- * reads that look like it, and reads under 3 letters (a mana cost) don't start the clock.
+ * card just committed (the next card arriving) to that card's commit. Reads of the last card, reads
+ * that look like it and didn't match another card exactly, and reads under 3 letters (a mana cost)
+ * don't start the clock. Time with the camera off doesn't count.
  */
 export class ReadTimer {
   private since: number | null = null;
   private lastKey: string | null = null;
   private lastName = '';
 
-  /** One camera read: its time, the text matched (or else the first candidate), and the matched card's key. */
-  saw(atMs: number, line: string, matchedKey: string | null): void {
+  /**
+   * One camera read: its time, the text matched (or else the first candidate), the matched card's
+   * key, and whether it matched exactly.
+   */
+  saw(atMs: number, line: string, matchedKey: string | null, exact: boolean): void {
     if (this.since !== null) return;
     const text = normalizeLine(line);
     if (text.replace(/[^\p{L}]/gu, '').length < MIN_LETTERS) return;
-    if (matchedKey !== null ? matchedKey === this.lastKey : similarity(text, this.lastName) >= SAME_CARD_SIMILARITY) return;
+    if (matchedKey !== null && matchedKey === this.lastKey) return;
+    if (!exact && similarity(text, this.lastName) >= SAME_CARD_SIMILARITY) return;
     this.since = atMs;
+  }
+
+  /** The camera stopped (paused, a sheet opened, the app left): drop the time so far, keep the last card. */
+  interrupt(): void {
+    this.since = null;
   }
 
   /** A card committed: returns ms since its first new read (null if none was seen), then times the next card. */

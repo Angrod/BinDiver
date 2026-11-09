@@ -82,4 +82,11 @@ describe('read times', () => {
     s.recordScan(scan({ runId: 1, at: 't2', readMs: 800 }));
     expect(createUserStore(db).runScans(1).map((x) => x.readMs)).toEqual([null, 800]);
   });
+  it('opens a log that an older build put back to version 1 after the upgrade', () => {
+    const db = memoryDb();
+    createUserStore(db).recordScan(scan({ readMs: 500 }));
+    db.exec('PRAGMA user_version = 1'); // what the first build's schema did on every launch
+    expect(() => createUserStore(db)).not.toThrow();
+    expect(db.get<{ user_version: number }>('PRAGMA user_version')?.user_version).toBe(2);
+  });
 });

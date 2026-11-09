@@ -1,7 +1,7 @@
 import type { Db } from '../../db/types';
 import type { CardMatch, Game } from '../types';
 import { cardName, lookupGroups, resolveExact } from './lookup';
-import { buildNameIndex, matchLine, prefixMatches } from './match';
+import { buildNameIndex, looseLine, matchLine, prefixMatches } from './match';
 import { normalizeName } from './normalize';
 import type { NameKind } from './types';
 
@@ -28,8 +28,12 @@ export function createMtgGame(db: Db): Game {
   }
 
   return {
-    matchTitle(line, loose = false) {
-      const m = matchLine(index, line, loose);
+    matchTitle(line) {
+      const m = matchLine(index, line);
+      return m ? resolve(m.norm, m.kind, m.lineUsed) : null;
+    },
+    matchTitleLoose(line) {
+      const m = looseLine(index, line);
       return m ? resolve(m.norm, m.kind, m.lineUsed) : null;
     },
     find,

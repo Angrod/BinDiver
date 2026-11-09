@@ -1,5 +1,5 @@
 import type { Db } from '../db/types';
-import { MIGRATIONS, USER_SCHEMA, USER_VERSION } from './schema';
+import { USER_SCHEMA, USER_VERSION } from './schema';
 
 export interface NewScan {
   at: string; runId: number | null; oracleIds: string[]; name: string;
@@ -31,12 +31,35 @@ interface ScanRow {
 const toRun = (r: RunRow | null): TestRun | null =>
   r && { id: r.id, startedAt: r.started_at, stoppedAt: r.stopped_at, stackCount: r.stack_count };
 
+const hasColumn = (db: Db, table: string, column: string): boolean =>
+  db.all<{ name: string }>(`PRAGMA table_info(${table})`).some((c) => c.name === column);
+
+/**
+ * MIGRATIONS[n - 1] takes the log from version n to n + 1. Each must be safe to run again: the first
+ * build resets user_version to 1 on launch, and expo-updates falls back to that build's code if an
+ * update crashes, so a log can come back to version 1 with its later columns already there.
+ */
+const MIGRATIONS: Array<(db: Db) => void> = [
+  // 2: how long each camera read took, from the card's first new read to its commit.
+  (db) => {
+    if (!hasColumn(db, 'scans', 'read_ms')) db.exec('ALTER TABLE scans ADD COLUMN read_ms INTEGER');
+  },
+];
+
 /** Creates the log if it is new, then upgrades it one version at a time, each step in a transaction. */
 function openLog(db: Db): void {
   db.exec(USER_SCHEMA);
   const found = db.get<{ user_version: number }>('PRAGMA user_version')?.user_version ?? 0;
   for (let v = Math.max(found, 1); v < USER_VERSION; v++) {
-    db.exec(`BEGIN; ${MIGRATIONS[v - 1]} PRAGMA user_version = ${v + 1}; COMMIT;`);
+    db.exec('BEGIN');
+    try {
+      MIGRATIONS[v - 1](db);
+      db.exec(`PRAGMA user_version = ${v + 1}`);
+      db.exec('COMMIT');
+    } catch (e) {
+      db.exec('ROLLBACK');
+      throw e;
+    }
   }
 }
 

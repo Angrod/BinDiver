@@ -68,19 +68,26 @@ describe('frameMsPerUnit', () => {
 
 describe('matchCandidates', () => {
   // A fake game: strict matches by exact text, loose matches by text starting with "loose:".
+  const looseCalls: string[] = [];
   const game = {
-    matchTitle(line: string, loose = false): CardMatch | null {
+    matchTitle(line: string): CardMatch | null {
       if (line === 'boom') throw new Error('boom');
-      if (line === 'Fireball') return match({ name: 'Fireball', lineUsed: 'fireball' });
-      if (loose && line.startsWith('loose:')) return match({ name: line.slice(6), match: 'tolerant' });
-      return null;
+      return line === 'Fireball' ? match({ name: 'Fireball', lineUsed: 'fireball' }) : null;
+    },
+    matchTitleLoose(line: string): CardMatch | null {
+      looseCalls.push(line);
+      return line.startsWith('loose:') ? match({ name: line.slice(6), match: 'tolerant' }) : null;
     },
   };
+  beforeEach(() => {
+    looseCalls.length = 0;
+  });
 
   test('a strict match on any line beats a loose match on an earlier one', () => {
     expect(matchCandidates(game, ['loose:Firebolt', 'Fireball'])).toMatchObject({
       match: { name: 'Fireball' }, matchedText: 'Fireball',
     });
+    expect(looseCalls).toEqual([]);
   });
   test('falls back to a loose match when nothing matches strictly', () => {
     expect(matchCandidates(game, ['junk', 'loose:Drought'])).toMatchObject({
@@ -92,6 +99,7 @@ describe('matchCandidates', () => {
     expect(matchCandidates(game, ['junk', 'boom', 'more junk'])).toEqual({
       match: null, matchedText: '', noMatch: ['junk', 'more junk'],
     });
+    expect(looseCalls).toEqual(['junk', 'more junk']);
     warn.mockRestore();
   });
 });

@@ -63,9 +63,15 @@ describe('diagnostics', () => {
     expect(formatLastRead('tap add g', null)).toBe('“tap add g” → none');
   });
   it('shows the OCR error and dropped frame counts', () => {
-    expect(formatCounters(0, 12, null)).toBe('OCR errors 0 · dropped 12');
+    expect(formatCounters(0, 12, null, null)).toBe('OCR errors 0 · dropped 12');
   });
   it('adds the live zoom and the zoom it should be at', () => {
-    expect(formatCounters(0, 12, { actual: 1, target: 2 })).toBe('OCR errors 0 · dropped 12 · zoom 1.0 (want 2.0)');
+    expect(formatCounters(0, 12, { actual: 1, target: 2 }, null)).toBe('OCR errors 0 · dropped 12 · zoom 1.0 (want 2.0)');
+  });
+  it('adds the average time matching takes per read', () => {
+    expect(formatCounters(0, 12, { actual: 2, target: 2 }, 3.4)).toBe(
+      'OCR errors 0 · dropped 12 · zoom 2.0 (want 2.0) · match 3 ms',
+    );
+    expect(formatCounters(0, 12, null, 0.2)).toBe('OCR errors 0 · dropped 12 · match 0 ms');
   });
 });

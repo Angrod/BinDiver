@@ -183,6 +183,8 @@ export function ScanScreen() {
   const sawFrame = useRef(false);
   /** The last candidate read and its result, for the debug line; rendered by the diagnostics timer. */
   const lastRead = useRef<string | null>(null);
+  /** A running average of the time matching takes per read, in ms, for the debug line. */
+  const matchMs = useRef<number | null>(null);
   /** The current run's candidate texts that matched nothing (in memory only). */
   const unmatched = useRef<{ runId: number; lines: UnmatchedLines } | null>(null);
   const [lastUnmatched, setLastUnmatched] = useState<{ runId: number; rows: UnmatchedRow[] } | null>(null);
@@ -196,7 +198,12 @@ export function ScanScreen() {
       if (!g) return; // cards are loading or being swapped: skip the frame
       // The top row joined, then each of its lines alone: strict matches first, then loose ones.
       const candidates = titleCandidates(lines);
+      const started = performance.now();
       const { match, matchedText, noMatch } = matchCandidates(g, candidates);
+      if (candidates.length > 0) {
+        const took = performance.now() - started;
+        matchMs.current = matchMs.current === null ? took : 0.9 * matchMs.current + 0.1 * took;
+      }
       if (candidates.length > 0) {
         lastRead.current = match
           ? formatLastRead(normalizeLine(matchedText), match.name)
@@ -211,7 +218,7 @@ export function ScanScreen() {
       }
       const key = commitKey(match);
       const atMs = Date.now();
-      readTimer.current.saw(atMs, matchedText || (candidates[0] ?? ''), key);
+      readTimer.current.saw(atMs, matchedText || (candidates[0] ?? ''), key, match?.match === 'exact');
       const committed = tracker.current.push(key);
       if (committed === null || match === null) return;
       const versions = versionsFor(match);
@@ -230,17 +237,22 @@ export function ScanScreen() {
   );
 
   const { frameOutput, readCounts } = useTitleReader({ region: geometry?.region ?? null, active: cameraOn, onText });
+  useEffect(() => {
+    if (!cameraOn) readTimer.current.interrupt();
+  }, [cameraOn]);
 
   // Diagnostics for the device run: one timer copies the last read and the counters into state.
   const [diag, setDiag] = useState<{ lastRead: string | null; counters: string }>(() => ({
-    lastRead: null, counters: formatCounters(0, 0, null),
+    lastRead: null, counters: formatCounters(0, 0, null, null),
   }));
   useEffect(() => {
     const id = setInterval(() => {
       const { ocrErrors, droppedFrames } = readCounts();
       // A stopped camera can't take a zoom, so only check it while the camera is on.
       const zoomNow = cameraOn ? checkZoom() : null;
-      const next = { lastRead: lastRead.current, counters: formatCounters(ocrErrors, droppedFrames, zoomNow) };
+      const next = {
+        lastRead: lastRead.current, counters: formatCounters(ocrErrors, droppedFrames, zoomNow, matchMs.current),
+      };
       setDiag((d) => (d.lastRead === next.lastRead && d.counters === next.counters ? d : next));
     }, DIAGNOSTICS_MS);
     return () => clearInterval(id);

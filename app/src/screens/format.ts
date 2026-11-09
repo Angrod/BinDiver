@@ -32,11 +32,14 @@ export function formatLastRead(text: string, matched: string | null): string {
   return `“${text}” → ${matched ?? 'none'}`;
 }
 
+/** The counters line: OCR errors, dropped frames, then the live zoom and match time when known. */
 export function formatCounters(
-  ocrErrors: number, dropped: number, zoom: { actual: number; target: number } | null,
+  ocrErrors: number, dropped: number, zoom: { actual: number; target: number } | null, matchMs: number | null,
 ): string {
-  const base = `OCR errors ${ocrErrors} · dropped ${dropped}`;
-  return zoom === null ? base : `${base} · zoom ${zoom.actual.toFixed(1)} (want ${zoom.target.toFixed(1)})`;
+  let line = `OCR errors ${ocrErrors} · dropped ${dropped}`;
+  if (zoom !== null) line += ` · zoom ${zoom.actual.toFixed(1)} (want ${zoom.target.toFixed(1)})`;
+  if (matchMs !== null) line += ` · match ${Math.round(matchMs)} ms`;
+  return line;
 }
 
 export function versionsLine(n: number): string {

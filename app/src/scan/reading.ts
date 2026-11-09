@@ -63,14 +63,16 @@ export interface CandidateMatch {
  * Matches a read's candidate lines in order: every line strictly first, then every line loosely, so a
  * loose match on the joined row can't beat an exact match on one of its lines.
  */
-export function matchCandidates(game: Pick<Game, 'matchTitle'>, candidates: string[]): CandidateMatch {
+export function matchCandidates(
+  game: Pick<Game, 'matchTitle' | 'matchTitleLoose'>, candidates: string[],
+): CandidateMatch {
   const failed = new Set<string>();
   for (const loose of [false, true]) {
     for (const candidate of candidates) {
       if (failed.has(candidate)) continue;
       let match: CardMatch | null;
       try {
-        match = game.matchTitle(candidate, loose);
+        match = loose ? game.matchTitleLoose(candidate) : game.matchTitle(candidate);
       } catch (e) {
         console.warn('matchTitle failed', e);
         failed.add(candidate);

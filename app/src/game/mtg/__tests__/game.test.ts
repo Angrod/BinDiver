@@ -31,9 +31,9 @@ test('matchTitle token', () => {
   expect(game.matchTitle('Saproling')).toMatchObject({ isToken: true, oracleIds: [] });
 });
 test('matchTitle no match', () => expect(game.matchTitle('xkcd qwerty')).toBeNull());
-test('matchTitle loose only when asked', () => {
+test('matchTitleLoose takes a read matchTitle misses', () => {
   expect(game.matchTitle('Cqunterspeii')).toBeNull();
-  expect(game.matchTitle('Cqunterspeii', true)).toMatchObject({ name: 'Counterspell', match: 'tolerant' });
+  expect(game.matchTitleLoose('Cqunterspeii')).toMatchObject({ name: 'Counterspell', match: 'tolerant' });
 });
 test('find', () => {
   expect(game.find('fire // ice')).toMatchObject({ name: 'Fire // Ice', match: 'typed' });

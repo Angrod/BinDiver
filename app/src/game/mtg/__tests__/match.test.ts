@@ -1,4 +1,4 @@
-import { buildNameIndex, levenshtein, matchLine, prefixMatches } from '../match';
+import { buildNameIndex, levenshtein, looseLine, matchLine, prefixMatches } from '../match';
 import { normalizeName } from '../normalize';
 import type { NameKind } from '../types';
 import names from '../__fixtures__/names.json';
@@ -90,27 +90,32 @@ const OLD_FRAME_GARBLES: Array<[string, string]> = [
 test('a loose camera match finds badly garbled old-frame titles the default misses', () => {
   for (const [read, name] of OLD_FRAME_GARBLES) {
     expect([read, matchLine(index, read)]).toEqual([read, null]);
-    expect([read, matchLine(index, read, true)]).toEqual([read, expect.objectContaining({ norm: normalizeName(name), kind: 'tolerant' })]);
+    expect([read, looseLine(index, read)]).toEqual([read, expect.objectContaining({ norm: normalizeName(name), kind: 'tolerant' })]);
   }
 });
 
 // Run 1: half-slid titles. Read from the middle of a word, they look like other cards at 0.7.
 test('a loose match needs the read to start like the name and have 6 letters', () => {
   for (const partial of ['nof evil', 'vdration', 'vwurning', 'are', 'sand']) {
-    expect([partial, matchLine(index, partial, true)]).toEqual([partial, null]);
+    expect([partial, looseLine(index, partial)]).toEqual([partial, null]);
   }
+});
+
+test('a loose match too close to call matches nothing', () => {
+  // Run 1: as close to Coercion as to Cooperation (8 of 11 letters right for each).
+  expect(looseLine(index, 'cogperucion')).toBeNull();
 });
 
 test('junk lines match nothing loosely either', () => {
   for (const junk of ['Creature — Elf Druid', 'Instant', 'Illus. Mark Poole', '© 1993 Wizards of the Coast', 'Tap: Add G', 'xkcd qwerty']) {
-    expect([junk, matchLine(index, junk, true)]).toEqual([junk, null]);
+    expect([junk, looseLine(index, junk)]).toEqual([junk, null]);
   }
 });
 
 test('loose lines average under 20 ms', () => {
   const lines = [...OLD_FRAME_GARBLES.map(([read]) => read), 'nof evil', 'vdration', 'sandstone', 'Creature — Elf Druid'];
   const start = performance.now();
-  for (let i = 0; i < 5; i++) for (const line of lines) matchLine(index, line, true);
+  for (let i = 0; i < 5; i++) for (const line of lines) looseLine(index, line);
   const avg = (performance.now() - start) / (5 * lines.length);
   console.log(`${avg.toFixed(2)} ms per loose line`);
   expect(avg).toBeLessThan(20);

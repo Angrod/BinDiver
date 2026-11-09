@@ -32,6 +32,8 @@ const MAX_TRIES = 4;
  */
 const LOOSE_SIMILARITY = 0.7;
 const LOOSE_MIN_LETTERS = 6;
+/** A loose match needs to beat every other name by this much; closer than that is too close to call. */
+const LOOSE_MARGIN = 0.02;
 const TOP_CANDIDATES = 50;
 
 function trigrams(norm: string): Set<string> {
@@ -150,8 +152,8 @@ function tolerant(index: NameIndex, text: string): Tolerant | null {
   return best;
 }
 
-// The closest name starting with the same character, at LOOSE_SIMILARITY or better; on a tie, the
-// first in sort order.
+// The closest name starting with the same character, at LOOSE_SIMILARITY or better; null when another
+// name is within LOOSE_MARGIN of it.
 function looseMatch(index: NameIndex, text: string): Tolerant | null {
   const { norms } = index;
   const list = index.byFirst.get(text[0]);
@@ -167,6 +169,7 @@ function looseMatch(index: NameIndex, text: string): Tolerant | null {
     else hi = mid;
   }
   let best: Tolerant | null = null;
+  let runnerUp = 0;
   for (let k = lo; k < list.length; k++) {
     const i = list[k];
     const norm = norms[i];
@@ -176,43 +179,30 @@ function looseMatch(index: NameIndex, text: string): Tolerant | null {
     const d = levenshtein(text, norm, maxD);
     if (d > maxD) continue;
     const similarity = 1 - d / L;
-    if (best === null || similarity > best.similarity || (similarity === best.similarity && norm < norms[best.idx])) {
+    if (best === null || similarity > best.similarity) {
+      if (best !== null) runnerUp = best.similarity;
       best = { idx: i, similarity, shared: 0 };
+    } else if (similarity > runnerUp) {
+      runnerUp = similarity;
     }
   }
-  return best;
+  return best !== null && best.similarity - runnerUp >= LOOSE_MARGIN - 1e-9 ? best : null;
 }
 
-/**
- * The best name for a read line: exact first, then tolerant at 0.8 or better. With `loose` (camera
- * reads), a line nothing else matched may also take a loose match.
- */
-export function matchLine(index: NameIndex, raw: string, loose = false): LineMatch | null {
+/** A read line normalized, then with up to 3 trailing mana-cost words dropped one at a time. */
+function linesToTry(raw: string): string[] {
   let words = normalizeName(raw).split(' ');
   const tries = [words.join(' ')];
   while (tries.length < MAX_TRIES && words.length > 1 && MANA_WORD.test(words[words.length - 1])) {
     words = words.slice(0, -1);
     tries.push(words.join(' '));
   }
-  for (const t of tries) {
-    const idx = index.byNorm.get(t);
-    if (idx !== undefined) {
-      return { norm: t, kind: 'exact', isToken: index.kinds[idx] === 'token', similarity: 1, lineUsed: t };
-    }
-  }
-  let best: (Tolerant & { lineUsed: string }) | null = null;
-  for (const t of tries) {
-    if (t === '') continue;
-    const r = tolerant(index, t);
-    if (r && (best === null || r.similarity > best.similarity)) best = { ...r, lineUsed: t };
-  }
-  if (!best && loose) {
-    for (const t of tries) {
-      if (t.replace(/[^a-z]/g, '').length < LOOSE_MIN_LETTERS) continue;
-      const r = looseMatch(index, t);
-      if (r && (best === null || r.similarity > best.similarity)) best = { ...r, lineUsed: t };
-    }
-  }
+  return tries;
+}
+
+type Best = (Tolerant & { lineUsed: string }) | null;
+
+function toMatch(index: NameIndex, best: Best): LineMatch | null {
   if (!best) return null;
   return {
     norm: index.norms[best.idx],
@@ -221,6 +211,39 @@ export function matchLine(index: NameIndex, raw: string, loose = false): LineMat
     similarity: best.similarity,
     lineUsed: best.lineUsed,
   };
+}
+
+/** The best name for a read line: exact first, then tolerant at 0.8 or better. */
+export function matchLine(index: NameIndex, raw: string): LineMatch | null {
+  const tries = linesToTry(raw);
+  for (const t of tries) {
+    const idx = index.byNorm.get(t);
+    if (idx !== undefined) {
+      return { norm: t, kind: 'exact', isToken: index.kinds[idx] === 'token', similarity: 1, lineUsed: t };
+    }
+  }
+  let best: Best = null;
+  for (const t of tries) {
+    if (t === '') continue;
+    const r = tolerant(index, t);
+    if (r && (best === null || r.similarity > best.similarity)) best = { ...r, lineUsed: t };
+  }
+  return toMatch(index, best);
+}
+
+/**
+ * Only the loose tier, for a camera line matchLine already missed: names starting with the line's
+ * first character, at LOOSE_SIMILARITY or better, for lines of LOOSE_MIN_LETTERS letters. Reported
+ * as 'tolerant'.
+ */
+export function looseLine(index: NameIndex, raw: string): LineMatch | null {
+  let best: Best = null;
+  for (const t of linesToTry(raw)) {
+    if (t.replace(/[^a-z]/g, '').length < LOOSE_MIN_LETTERS) continue;
+    const r = looseMatch(index, t);
+    if (r && (best === null || r.similarity > best.similarity)) best = { ...r, lineUsed: t };
+  }
+  return toMatch(index, best);
 }
 
 export function prefixMatches(index: NameIndex, typed: string, limit: number): string[] {
