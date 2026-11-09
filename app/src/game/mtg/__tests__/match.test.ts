@@ -53,6 +53,43 @@ test('prefix matches by length then name', () => {
   ]);
 });
 
+// Run 4 (Nov 9): "_____ _____ Rocketship" is stored as "_ _ rocketship", but the camera reads only the
+// printed words ("Rocketship 4", 45 reads), so blank-name cards are also indexed without their blanks.
+describe('blank-name cards', () => {
+  it('match the words printed around their blanks', () => {
+    for (const [line, norm] of [
+      ['Rocketship 4', '_ _ rocketship'], ['Balls of Fire', '_ balls of fire'], ['Knight in Armor', 'knight in _ armor'],
+      ['Bird Gets the Worm', '_ bird gets the worm'], ['-o-saurus', '_ o saurus'], ['Sort of and', 'sort of _ and _'],
+    ]) {
+      expect([line, matchLine(index, line)]).toEqual([line, expect.objectContaining({ norm, kind: 'exact' })]);
+    }
+  });
+  it('match a misread of those words tolerantly', () => {
+    expect(matchLine(index, 'rockefship')).toMatchObject({ norm: '_ _ rocketship', kind: 'tolerant', lineUsed: 'rockefship' });
+  });
+  it('still match their full stored names', () => {
+    expect(matchLine(index, '_____ _____ Rocketship')).toMatchObject({ norm: '_ _ rocketship', kind: 'exact' });
+  });
+  it('get no key when the words are inside other names, so a half-read card cannot land on them', () => {
+    for (const blank of ['_ goblin', '_ _ _ trespasser', 'wizards of the _', '_']) {
+      expect([blank, index.targets.filter((t) => t === blank).length]).toEqual([blank, 1]);
+    }
+    expect(matchLine(index, 'goblin')?.norm).not.toBe('_ goblin');
+    // Not a key: "wizards of the" is 2 letters from the stored name, so the tolerant tier matched it before.
+    expect(matchLine(index, 'wizards of the')).toMatchObject({ norm: 'wizards of the _', kind: 'tolerant' });
+  });
+  it('suggest the stored name once when typed', () => {
+    expect(prefixMatches(index, 'rocketsh', 5)).toEqual(['_ _ rocketship']);
+    expect(prefixMatches(index, '_ _ rock', 5)).toEqual(['_ _ rocketship']);
+  });
+  it('need exactly one card behind the words left over', () => {
+    const i = buildNameIndex([['_ sky', 'full'], ['sky _', 'full'], ['_ moon', 'full'], ['_', 'full']]);
+    expect(matchLine(i, 'sky')).toBeNull();
+    expect(matchLine(i, 'moon')).toMatchObject({ norm: '_ moon', kind: 'exact' });
+    expect(i.norms).toHaveLength(5);
+  });
+});
+
 // Known risk, kept for gate tuning (no matcher change): some rules-text keywords are exact card names,
 // so a rules line read inside the title band matches that card. "Flashback {2}{R}" loses its mana word
 // and still lands on Flashback. This pins today's behaviour; revisit if the gate shows such reads.

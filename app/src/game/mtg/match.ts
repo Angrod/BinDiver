@@ -10,7 +10,10 @@ export interface LineMatch {
 }
 
 export interface NameIndex {
+  /** The keys matched against: every stored name, then the blank-free keys of blank-name cards. */
   norms: string[];
+  /** The stored name each key stands for: itself, or the blank-name card a blank-free key reads as. */
+  targets: string[];
   kinds: NameKind[];
   byNorm: Map<string, number>;
   grams: Map<string, number[]>;
@@ -43,14 +46,41 @@ function trigrams(norm: string): Set<string> {
   return out;
 }
 
+/**
+ * Keys for blank-name cards ("_____ _____ Rocketship" is stored as "_ _ rocketship"), whose blanks the
+ * camera doesn't read: the words left without the blanks, each standing for its one card. Skipped when
+ * nothing is left, when two cards leave the same words, or when the words are inside another name, so
+ * a half-read card ("goblin" from Goblin Bowling Team) can't land on one ("_____ Goblin").
+ */
+function blankFreeKeys(stored: string[]): Map<string, string> {
+  const sources = new Map<string, string[]>();
+  for (const norm of stored) {
+    const words = norm.split(' ');
+    if (!words.includes('_')) continue;
+    const key = words.filter((w) => w !== '_').join(' ');
+    if (key === '') continue;
+    const list = sources.get(key);
+    if (list) list.push(norm);
+    else sources.set(key, [norm]);
+  }
+  const keys = new Map<string, string>();
+  for (const [key, from] of sources) {
+    if (from.length === 1 && !stored.some((n) => n !== from[0] && n.includes(key))) keys.set(key, from[0]);
+  }
+  return keys;
+}
+
 export function buildNameIndex(entries: Array<[string, NameKind]>): NameIndex {
   const best = new Map<string, NameKind>();
   for (const [norm, kind] of entries) {
     const have = best.get(norm);
     if (have === undefined || KIND_RANK[kind] < KIND_RANK[have]) best.set(norm, kind);
   }
-  const norms = [...best.keys()].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
-  const kinds = norms.map((n) => best.get(n) as NameKind);
+  const stored = [...best.keys()].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  const extra = [...blankFreeKeys(stored)].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  const norms = [...stored, ...extra.map(([key]) => key)];
+  const targets = [...stored, ...extra.map(([, target]) => target)];
+  const kinds = targets.map((n) => best.get(n) as NameKind);
   const byNorm = new Map<string, number>();
   const grams = new Map<string, number[]>();
   const byFirst = new Map<string, number[]>();
@@ -66,7 +96,7 @@ export function buildNameIndex(entries: Array<[string, NameKind]>): NameIndex {
     }
   });
   for (const list of byFirst.values()) list.sort((x, y) => norms[x].length - norms[y].length || x - y);
-  return { norms, kinds, byNorm, grams, byFirst, counts: new Int32Array(norms.length) };
+  return { norms, targets, kinds, byNorm, grams, byFirst, counts: new Int32Array(norms.length) };
 }
 
 // Rows reused across calls: matching runs on every camera read, so it doesn't allocate per name.
@@ -205,7 +235,7 @@ type Best = (Tolerant & { lineUsed: string }) | null;
 function toMatch(index: NameIndex, best: Best, kind: 'tolerant' | 'loose'): LineMatch | null {
   if (!best) return null;
   return {
-    norm: index.norms[best.idx],
+    norm: index.targets[best.idx],
     kind,
     isToken: index.kinds[best.idx] === 'token',
     similarity: best.similarity,
@@ -219,7 +249,7 @@ export function matchLine(index: NameIndex, raw: string): LineMatch | null {
   for (const t of tries) {
     const idx = index.byNorm.get(t);
     if (idx !== undefined) {
-      return { norm: t, kind: 'exact', isToken: index.kinds[idx] === 'token', similarity: 1, lineUsed: t };
+      return { norm: index.targets[idx], kind: 'exact', isToken: index.kinds[idx] === 'token', similarity: 1, lineUsed: t };
     }
   }
   let best: Best = null;
@@ -250,7 +280,8 @@ export function prefixMatches(index: NameIndex, typed: string, limit: number): s
   const prefix = normalizeName(typed);
   const out: string[] = [];
   index.norms.forEach((norm, i) => {
-    if (index.kinds[i] !== 'token' && norm.startsWith(prefix)) out.push(norm);
+    const target = index.targets[i];
+    if (index.kinds[i] !== 'token' && norm.startsWith(prefix) && !out.includes(target)) out.push(target);
   });
   out.sort((a, b) => a.length - b.length || (a < b ? -1 : a > b ? 1 : 0));
   return out.slice(0, limit);
