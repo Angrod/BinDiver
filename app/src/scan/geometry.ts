@@ -5,8 +5,11 @@ export interface PercentRegion { left: Percent; top: Percent; width: Percent; he
 
 export const CARD_ASPECT = 63 / 88; // width / height
 export const OUTLINE_SHARE = 0.88; // outline fits within 88% of the view in both directions
-export const BAND_TOP = 0.03;
-export const BAND_HEIGHT = 0.12; // title strip, as shares of the outline's height
+// The title strip, as shares of the outline: from 2% above its top edge to 20% down, and 4% of its
+// width past each side. A title sits about 5-8% down a card; only the topmost line in the strip is read.
+export const BAND_TOP = -0.02;
+export const BAND_HEIGHT = 0.22;
+export const BAND_SIDE = 0.04;
 export const FRAME_ASPECT = 9 / 16; // display-oriented frame (CommonResolutions.FHD_16_9)
 /**
  * Field of view relative to the main camera; tune at the gate.
@@ -56,12 +59,12 @@ export function cardOutline(view: Size): Rect {
   return { x: (view.width - width) / 2, y: (view.height - height) / 2, width, height };
 }
 
-/** The title strip near the top of the outline. */
+/** The title strip across the top of the outline. */
 export function titleBand(outline: Rect): Rect {
   return {
-    x: outline.x,
+    x: outline.x - BAND_SIDE * outline.width,
     y: outline.y + BAND_TOP * outline.height,
-    width: outline.width,
+    width: (1 + 2 * BAND_SIDE) * outline.width,
     height: BAND_HEIGHT * outline.height,
   };
 }

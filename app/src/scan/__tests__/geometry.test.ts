@@ -17,8 +17,19 @@ describe('cardOutline', () => {
 });
 
 describe('titleBand', () => {
-  it('is a strip near the top of the outline', () => {
-    expectRect(titleBand({ x: 75.3, y: 22.8, width: 239.4, height: 334.4 }), { x: 75.3, y: 32.832, width: 239.4, height: 40.128 });
+  // Matt (Nov 9): the 3-15% strip was tight to line a title up in. It now runs from 2% above the
+  // outline's top edge to 20% down, 4% wider on each side; it stops just above the outline so a card
+  // standing behind in a bin doesn't put its own title on top.
+  it('runs from just above the outline to a fifth of the way down, a little wider than the outline', () => {
+    expectRect(titleBand({ x: 75.3, y: 22.8, width: 239.4, height: 334.4 }), { x: 65.724, y: 16.112, width: 258.552, height: 73.568 });
+  });
+  it('stays inside the view for both a height-limited and a width-limited outline', () => {
+    for (const view of [{ width: 390, height: 380 }, { width: 200, height: 380 }]) {
+      const band = titleBand(cardOutline(view));
+      expect(band.x).toBeGreaterThanOrEqual(0);
+      expect(band.y).toBeGreaterThanOrEqual(0);
+      expect(band.x + band.width).toBeLessThanOrEqual(view.width);
+    }
   });
 });
 
@@ -33,7 +44,7 @@ describe('viewRectToFrameRegion', () => {
     const view = { width: 390, height: 380 };
     const band = titleBand(cardOutline(view));
     expect(viewRectToFrameRegion(band, view)).toEqual({
-      left: '19.31%', top: '27.33%', width: '61.38%', height: '5.79%',
+      left: '16.85%', top: '24.92%', width: '66.30%', height: '10.61%',
     });
   });
   it('maps when the frame is cropped left and right', () => {
