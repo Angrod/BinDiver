@@ -1,3 +1,4 @@
+import type { CardMatch } from '../game/types';
 import type { Size } from '../scan/geometry';
 
 const DASH = '—';
@@ -40,6 +41,11 @@ export function formatCounters(
   if (zoom !== null) line += ` · zoom ${zoom.actual.toFixed(1)} (want ${zoom.target.toFixed(1)})`;
   if (matchMs !== null) line += ` · match ${Math.round(matchMs)} ms`;
   return line;
+}
+
+/** Whether a match shows the line it was read from: one read with misread letters. */
+export function showsReadAs(match: CardMatch['match']): boolean {
+  return match === 'tolerant' || match === 'loose';
 }
 
 export function versionsLine(n: number): string {

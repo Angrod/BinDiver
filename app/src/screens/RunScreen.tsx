@@ -9,7 +9,7 @@ import { unmatchedToCsv, type UnmatchedRow } from '../scan/unmatched';
 import { useAppData } from '../state/AppData';
 import { runToCsv, summarizeRun } from '../user/runReport';
 import type { Scan, TestRun } from '../user/store';
-import { formatReadRight, formatSecondsPerCard, parseStackCount, timeOfDay } from './format';
+import { formatReadRight, formatSecondsPerCard, parseStackCount, showsReadAs, timeOfDay } from './format';
 
 const UNMATCHED_SHOWN = 50;
 
@@ -150,7 +150,7 @@ export function RunScreen({ visible, unmatched, onStart, onClose }: Props) {
                 <Text style={styles.scanName} numberOfLines={1}>{item.name}</Text>
                 <Text style={styles.scanDetail} numberOfLines={1}>
                   {timeOfDay(item.at)} · {item.source} · {item.match}
-                  {item.match === 'tolerant' ? ` · “${item.lineUsed}”` : ''}
+                  {showsReadAs(item.match) ? ` · “${item.lineUsed}”` : ''}
                 </Text>
               </View>
               <Text style={styles.wrongLabel}>Wrong</Text>

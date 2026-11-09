@@ -4,7 +4,7 @@ import { USER_SCHEMA, USER_VERSION } from './schema';
 export interface NewScan {
   at: string; runId: number | null; oracleIds: string[]; name: string;
   source: 'camera' | 'search'; rawText: string; lineUsed: string;
-  match: 'exact' | 'tolerant' | 'typed'; priceDate: string; minCents: number; alerted: boolean;
+  match: 'exact' | 'tolerant' | 'loose' | 'typed'; priceDate: string; minCents: number; alerted: boolean;
   /** Camera reads: ms from the card's first new read to its commit; null when unknown or typed. */
   readMs: number | null;
 }
@@ -24,7 +24,7 @@ interface RunRow { id: number; started_at: string; stopped_at: string | null; st
 interface ScanRow {
   id: number; at: string; run_id: number | null; oracle_id: string; name: string;
   source: 'camera' | 'search'; raw_text: string; line_used: string;
-  match: 'exact' | 'tolerant' | 'typed'; price_date: string; min_cents: number;
+  match: 'exact' | 'tolerant' | 'loose' | 'typed'; price_date: string; min_cents: number;
   alerted: number; marked_wrong: number; read_ms: number | null;
 }
 

@@ -3,7 +3,7 @@ import type { NameKind } from './types';
 
 export interface LineMatch {
   norm: string;
-  kind: 'exact' | 'tolerant';
+  kind: 'exact' | 'tolerant' | 'loose';
   isToken: boolean;
   similarity: number;
   lineUsed: string;
@@ -202,11 +202,11 @@ function linesToTry(raw: string): string[] {
 
 type Best = (Tolerant & { lineUsed: string }) | null;
 
-function toMatch(index: NameIndex, best: Best): LineMatch | null {
+function toMatch(index: NameIndex, best: Best, kind: 'tolerant' | 'loose'): LineMatch | null {
   if (!best) return null;
   return {
     norm: index.norms[best.idx],
-    kind: 'tolerant',
+    kind,
     isToken: index.kinds[best.idx] === 'token',
     similarity: best.similarity,
     lineUsed: best.lineUsed,
@@ -228,13 +228,13 @@ export function matchLine(index: NameIndex, raw: string): LineMatch | null {
     const r = tolerant(index, t);
     if (r && (best === null || r.similarity > best.similarity)) best = { ...r, lineUsed: t };
   }
-  return toMatch(index, best);
+  return toMatch(index, best, 'tolerant');
 }
 
 /**
  * Only the loose tier, for a camera line matchLine already missed: names starting with the line's
  * first character, at LOOSE_SIMILARITY or better, for lines of LOOSE_MIN_LETTERS letters. Reported
- * as 'tolerant'.
+ * as 'loose'.
  */
 export function looseLine(index: NameIndex, raw: string): LineMatch | null {
   let best: Best = null;
@@ -243,7 +243,7 @@ export function looseLine(index: NameIndex, raw: string): LineMatch | null {
     const r = looseMatch(index, t);
     if (r && (best === null || r.similarity > best.similarity)) best = { ...r, lineUsed: t };
   }
-  return toMatch(index, best);
+  return toMatch(index, best, 'loose');
 }
 
 export function prefixMatches(index: NameIndex, typed: string, limit: number): string[] {

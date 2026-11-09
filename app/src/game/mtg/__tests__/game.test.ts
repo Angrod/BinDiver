@@ -33,7 +33,7 @@ test('matchTitle token', () => {
 test('matchTitle no match', () => expect(game.matchTitle('xkcd qwerty')).toBeNull());
 test('matchTitleLoose takes a read matchTitle misses', () => {
   expect(game.matchTitle('Cqunterspeii')).toBeNull();
-  expect(game.matchTitleLoose('Cqunterspeii')).toMatchObject({ name: 'Counterspell', match: 'tolerant' });
+  expect(game.matchTitleLoose('Cqunterspeii')).toMatchObject({ name: 'Counterspell', match: 'loose' });
 });
 test('find', () => {
   expect(game.find('fire // ice')).toMatchObject({ name: 'Fire // Ice', match: 'typed' });

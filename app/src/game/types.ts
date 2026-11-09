@@ -3,7 +3,7 @@ import type { CardGroup, SortOrder } from './mtg/types';
 export interface CardMatch {
   oracleIds: string[];
   name: string;
-  match: 'exact' | 'tolerant' | 'typed';
+  match: 'exact' | 'tolerant' | 'loose' | 'typed';
   isToken: boolean;
   lineUsed: string;
 }

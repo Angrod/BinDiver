@@ -18,8 +18,9 @@ import { ReadTimer } from '../scan/readTimer';
 import { normalizeLine, UnmatchedLines, type UnmatchedRow } from '../scan/unmatched';
 import { useTitleReader } from '../scan/useTitleReader';
 import { useAppData } from '../state/AppData';
+import { useUpdateStatus } from '../updates/useUpdateStatus';
 import type { TestRun } from '../user/store';
-import { formatCounters, formatElapsed, formatFrameSize, formatLastRead, versionsLine } from './format';
+import { formatCounters, formatElapsed, formatFrameSize, formatLastRead, showsReadAs, versionsLine } from './format';
 import { RunScreen } from './RunScreen';
 import { SearchSheet } from './SearchSheet';
 
@@ -40,6 +41,7 @@ interface Shown {
 export function ScanScreen() {
   useKeepAwake();
   const { game, priceDate, user } = useAppData();
+  const updateStatus = useUpdateStatus();
 
   // The frame handler runs outside React's render cycle, so it reads current values through refs.
   const gameRef = useRef(game);
@@ -352,6 +354,7 @@ export function ScanScreen() {
         {frameSize && <Text style={styles.grey}>{formatFrameSize(frameSize)}</Text>}
         {diag.lastRead !== null && <Text style={styles.debug} numberOfLines={1}>{diag.lastRead}</Text>}
         <Text style={styles.debug}>{diag.counters}</Text>
+        <Text style={styles.debug}>{updateStatus}</Text>
         {game === null && <Text style={styles.grey}>Loading cards…</Text>}
 
         <View style={styles.result}>
@@ -361,7 +364,7 @@ export function ScanScreen() {
                 {shown.name}
               </Text>
               <Text style={styles.detail}>{shown.isToken ? 'Token, not tracked' : versionsLine(shown.versions)}</Text>
-              {shown.match === 'tolerant' && <Text style={styles.grey}>Read as “{shown.lineUsed}”</Text>}
+              {showsReadAs(shown.match) && <Text style={styles.grey}>Read as “{shown.lineUsed}”</Text>}
             </>
           ) : (
             <Text style={styles.grey}>No card read yet</Text>

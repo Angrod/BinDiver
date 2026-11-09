@@ -1,6 +1,6 @@
 import {
   formatCounters, formatElapsed, formatFrameSize, formatLastRead, formatReadRight, formatSecondsPerCard,
-  parseStackCount, versionsLine,
+  parseStackCount, showsReadAs, versionsLine,
 } from '../format';
 
 describe('formatElapsed', () => {
@@ -73,5 +73,14 @@ describe('diagnostics', () => {
       'OCR errors 0 · dropped 12 · zoom 2.0 (want 2.0) · match 3 ms',
     );
     expect(formatCounters(0, 12, null, 0.2)).toBe('OCR errors 0 · dropped 12 · match 0 ms');
+  });
+});
+
+describe('showsReadAs', () => {
+  it('shows the line read for tolerant and loose matches only', () => {
+    expect(showsReadAs('tolerant')).toBe(true);
+    expect(showsReadAs('loose')).toBe(true);
+    expect(showsReadAs('exact')).toBe(false);
+    expect(showsReadAs('typed')).toBe(false);
   });
 });

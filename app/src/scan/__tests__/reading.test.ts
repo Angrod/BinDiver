@@ -76,7 +76,7 @@ describe('matchCandidates', () => {
     },
     matchTitleLoose(line: string): CardMatch | null {
       looseCalls.push(line);
-      return line.startsWith('loose:') ? match({ name: line.slice(6), match: 'tolerant' }) : null;
+      return line.startsWith('loose:') ? match({ name: line.slice(6), match: 'loose' }) : null;
     },
   };
   beforeEach(() => {
@@ -91,7 +91,7 @@ describe('matchCandidates', () => {
   });
   test('falls back to a loose match when nothing matches strictly', () => {
     expect(matchCandidates(game, ['junk', 'loose:Drought'])).toMatchObject({
-      match: { name: 'Drought', match: 'tolerant' }, matchedText: 'loose:Drought',
+      match: { name: 'Drought', match: 'loose' }, matchedText: 'loose:Drought',
     });
   });
   test('lists the lines that matched nothing, skipping one that threw', () => {

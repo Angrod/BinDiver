@@ -94,7 +94,7 @@ const OLD_FRAME_GARBLES: Array<[string, string]> = [
 test('a loose camera match finds badly garbled old-frame titles the default misses', () => {
   for (const [read, name] of OLD_FRAME_GARBLES) {
     expect([read, matchLine(index, read)]).toEqual([read, null]);
-    expect([read, looseLine(index, read)]).toEqual([read, expect.objectContaining({ norm: normalizeName(name), kind: 'tolerant' })]);
+    expect([read, looseLine(index, read)]).toEqual([read, expect.objectContaining({ norm: normalizeName(name), kind: 'loose' })]);
   }
 });
 

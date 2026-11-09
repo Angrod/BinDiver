@@ -1,5 +1,7 @@
 /** The most distinct unmatched texts one run keeps. */
 export const UNMATCHED_CAP = 200;
+/** Shorter texts are scraps of a card sliding in, not lines worth tuning for. */
+export const UNMATCHED_MIN_LETTERS = 3;
 
 export interface UnmatchedRow { text: string; count: number }
 
@@ -18,10 +20,13 @@ export class UnmatchedLines {
 
   constructor(private readonly cap: number = UNMATCHED_CAP) {}
 
-  /** Counts one unmatched text by its normalized form. Blank texts are ignored; new texts past the cap are dropped. */
+  /**
+   * Counts one unmatched text by its normalized form. Texts with fewer than UNMATCHED_MIN_LETTERS letters
+   * are ignored; new texts past the cap are dropped.
+   */
   add(text: string): void {
     const norm = normalizeLine(text);
-    if (norm === '') return;
+    if ((norm.match(/\p{L}/gu)?.length ?? 0) < UNMATCHED_MIN_LETTERS) return;
     const have = this.counts.get(norm);
     if (have !== undefined) this.counts.set(norm, have + 1);
     else if (this.counts.size < this.cap) this.counts.set(norm, 1);
