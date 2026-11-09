@@ -29,6 +29,7 @@ describe('titleBand', () => {
       expect(band.x).toBeGreaterThanOrEqual(0);
       expect(band.y).toBeGreaterThanOrEqual(0);
       expect(band.x + band.width).toBeLessThanOrEqual(view.width);
+      expect(band.y + band.height).toBeLessThanOrEqual(view.height);
     }
   });
 });
