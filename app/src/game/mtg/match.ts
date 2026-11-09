@@ -14,12 +14,24 @@ export interface NameIndex {
   kinds: NameKind[];
   byNorm: Map<string, number>;
   grams: Map<string, number[]>;
+  /** Names by their first character, each list shortest first, for loose matches. */
+  byFirst: Map<string, number[]>;
   counts: Int32Array;
 }
 
 const KIND_RANK: Record<NameKind, number> = { full: 0, face: 1, token: 2 };
-const MANA_WORD = /^[0-9wubrgcxso]{1,6}$/;
+// A trailing word that is a mana cost: mana letters and digits, or a digit then up to two letters or
+// digits, which is how the camera reader writes some mana symbols ("2e", "3e", "1a").
+const MANA_WORD = /^(?:[0-9wubrgcxso]{1,6}|[0-9][0-9a-z]{0,2})$/;
 const MAX_TRIES = 4;
+/**
+ * Loose matches, for camera reads only: badly garbled old-frame titles sit between this and the 0.8
+ * tolerant cutoff. The commit rule's 3 agreeing reads in a row guard against a wrong card, and a loose
+ * match must start with the read's first character and the read must have LOOSE_MIN_LETTERS letters,
+ * so a title read from the middle of a word, half slid in, doesn't pass for another card.
+ */
+const LOOSE_SIMILARITY = 0.7;
+const LOOSE_MIN_LETTERS = 6;
 const TOP_CANDIDATES = 50;
 
 function trigrams(norm: string): Set<string> {
@@ -39,36 +51,63 @@ export function buildNameIndex(entries: Array<[string, NameKind]>): NameIndex {
   const kinds = norms.map((n) => best.get(n) as NameKind);
   const byNorm = new Map<string, number>();
   const grams = new Map<string, number[]>();
+  const byFirst = new Map<string, number[]>();
   norms.forEach((norm, i) => {
     byNorm.set(norm, i);
+    const first = byFirst.get(norm[0]);
+    if (first) first.push(i);
+    else byFirst.set(norm[0], [i]);
     for (const g of trigrams(norm)) {
       const list = grams.get(g);
       if (list) list.push(i);
       else grams.set(g, [i]);
     }
   });
-  return { norms, kinds, byNorm, grams, counts: new Int32Array(norms.length) };
+  for (const list of byFirst.values()) list.sort((x, y) => norms[x].length - norms[y].length || x - y);
+  return { norms, kinds, byNorm, grams, byFirst, counts: new Int32Array(norms.length) };
 }
 
-// Levenshtein distance, giving up (returning maxD + 1) once it must exceed maxD.
-function levenshtein(a: string, b: string, maxD: number): number {
-  if (Math.abs(a.length - b.length) > maxD) return maxD + 1;
-  let prev = new Int32Array(b.length + 1);
-  let cur = new Int32Array(b.length + 1);
-  for (let j = 0; j <= b.length; j++) prev[j] = j;
-  for (let i = 1; i <= a.length; i++) {
-    cur[0] = i;
-    let rowMin = i;
+// Rows reused across calls: matching runs on every camera read, so it doesn't allocate per name.
+let rowA = new Int32Array(64);
+let rowB = new Int32Array(64);
+
+/**
+ * Levenshtein distance when it is at most maxD; otherwise some number above maxD. Only the band of
+ * cells within maxD of the diagonal is filled, and it gives up once a whole row exceeds maxD.
+ */
+export function levenshtein(a: string, b: string, maxD: number): number {
+  const n = a.length;
+  const m = b.length;
+  const far = maxD + 1;
+  if (Math.abs(n - m) > maxD) return far;
+  if (rowA.length < m + 2) {
+    rowA = new Int32Array(m + 2);
+    rowB = new Int32Array(m + 2);
+  }
+  let prev = rowA;
+  let cur = rowB;
+  for (let j = 0; j <= m + 1; j++) prev[j] = j <= maxD ? j : far;
+  for (let i = 1; i <= n; i++) {
+    const lo = Math.max(1, i - maxD);
+    const hi = Math.min(m, i + maxD);
+    cur[lo - 1] = lo === 1 && i <= maxD ? i : far;
+    let rowMin = cur[lo - 1];
     const ca = a.charCodeAt(i - 1);
-    for (let j = 1; j <= b.length; j++) {
-      const v = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (ca === b.charCodeAt(j - 1) ? 0 : 1));
+    for (let j = lo; j <= hi; j++) {
+      let v = prev[j - 1] + (ca === b.charCodeAt(j - 1) ? 0 : 1);
+      if (prev[j] + 1 < v) v = prev[j] + 1;
+      if (cur[j - 1] + 1 < v) v = cur[j - 1] + 1;
+      if (v > far) v = far;
       cur[j] = v;
       if (v < rowMin) rowMin = v;
     }
-    if (rowMin > maxD) return maxD + 1;
-    [prev, cur] = [cur, prev];
+    if (hi < m) cur[hi + 1] = far;
+    if (rowMin > maxD) return far;
+    const t = prev;
+    prev = cur;
+    cur = t;
   }
-  return prev[b.length];
+  return prev[m];
 }
 
 interface Tolerant { idx: number; similarity: number; shared: number }
@@ -111,7 +150,44 @@ function tolerant(index: NameIndex, text: string): Tolerant | null {
   return best;
 }
 
-export function matchLine(index: NameIndex, raw: string): LineMatch | null {
+// The closest name starting with the same character, at LOOSE_SIMILARITY or better; on a tie, the
+// first in sort order.
+function looseMatch(index: NameIndex, text: string): Tolerant | null {
+  const { norms } = index;
+  const list = index.byFirst.get(text[0]);
+  if (!list) return null;
+  // Lengths that can be within the cutoff: 0.7 of the text's length up to the text's length / 0.7.
+  const shortest = Math.ceil(text.length * LOOSE_SIMILARITY - 1e-9);
+  const longest = Math.floor(text.length / LOOSE_SIMILARITY + 1e-9);
+  let lo = 0;
+  let hi = list.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (norms[list[mid]].length < shortest) lo = mid + 1;
+    else hi = mid;
+  }
+  let best: Tolerant | null = null;
+  for (let k = lo; k < list.length; k++) {
+    const i = list[k];
+    const norm = norms[i];
+    if (norm.length > longest) break;
+    const L = Math.max(text.length, norm.length);
+    const maxD = Math.floor(L * (1 - LOOSE_SIMILARITY) + 1e-9);
+    const d = levenshtein(text, norm, maxD);
+    if (d > maxD) continue;
+    const similarity = 1 - d / L;
+    if (best === null || similarity > best.similarity || (similarity === best.similarity && norm < norms[best.idx])) {
+      best = { idx: i, similarity, shared: 0 };
+    }
+  }
+  return best;
+}
+
+/**
+ * The best name for a read line: exact first, then tolerant at 0.8 or better. With `loose` (camera
+ * reads), a line nothing else matched may also take a loose match.
+ */
+export function matchLine(index: NameIndex, raw: string, loose = false): LineMatch | null {
   let words = normalizeName(raw).split(' ');
   const tries = [words.join(' ')];
   while (tries.length < MAX_TRIES && words.length > 1 && MANA_WORD.test(words[words.length - 1])) {
@@ -129,6 +205,13 @@ export function matchLine(index: NameIndex, raw: string): LineMatch | null {
     if (t === '') continue;
     const r = tolerant(index, t);
     if (r && (best === null || r.similarity > best.similarity)) best = { ...r, lineUsed: t };
+  }
+  if (!best && loose) {
+    for (const t of tries) {
+      if (t.replace(/[^a-z]/g, '').length < LOOSE_MIN_LETTERS) continue;
+      const r = looseMatch(index, t);
+      if (r && (best === null || r.similarity > best.similarity)) best = { ...r, lineUsed: t };
+    }
   }
   if (!best) return null;
   return {

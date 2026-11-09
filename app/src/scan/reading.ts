@@ -1,5 +1,5 @@
 import type { CardGroup } from '../game/mtg/types';
-import type { CardMatch } from '../game/types';
+import type { CardMatch, Game } from '../game/types';
 import type { Size } from './geometry';
 
 /**
@@ -49,4 +49,35 @@ export function displayFrameSize(raw: RawFrameSize): Size {
 /** How many versions qualify across the card's groups. */
 export function qualifyingVersions(groups: CardGroup[]): number {
   return groups.reduce((n, g) => n + g.qualifying.length, 0);
+}
+
+/** A read's match: the first candidate line that matched, and the lines that matched nothing. */
+export interface CandidateMatch {
+  match: CardMatch | null;
+  matchedText: string;
+  /** Candidates that matched nothing (a line whose match threw is left out). */
+  noMatch: string[];
+}
+
+/**
+ * Matches a read's candidate lines in order: every line strictly first, then every line loosely, so a
+ * loose match on the joined row can't beat an exact match on one of its lines.
+ */
+export function matchCandidates(game: Pick<Game, 'matchTitle'>, candidates: string[]): CandidateMatch {
+  const failed = new Set<string>();
+  for (const loose of [false, true]) {
+    for (const candidate of candidates) {
+      if (failed.has(candidate)) continue;
+      let match: CardMatch | null;
+      try {
+        match = game.matchTitle(candidate, loose);
+      } catch (e) {
+        console.warn('matchTitle failed', e);
+        failed.add(candidate);
+        continue;
+      }
+      if (match !== null) return { match, matchedText: candidate, noMatch: [] };
+    }
+  }
+  return { match: null, matchedText: '', noMatch: candidates.filter((c) => !failed.has(c)) };
 }

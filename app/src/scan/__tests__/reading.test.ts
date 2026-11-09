@@ -1,7 +1,7 @@
 import type { CardGroup } from '../../game/mtg/types';
 import type { CardMatch } from '../../game/types';
 import {
-  commitKey, displayFrameSize, frameMsPerUnit, qualifyingVersions, readDue, READ_INTERVAL_MS,
+  commitKey, displayFrameSize, frameMsPerUnit, matchCandidates, qualifyingVersions, readDue, READ_INTERVAL_MS,
 } from '../reading';
 
 const match = (over: Partial<CardMatch>): CardMatch => ({
@@ -63,5 +63,35 @@ describe('frameMsPerUnit', () => {
   it('converts VisionCamera frame timestamps: seconds on iOS, nanoseconds on Android', () => {
     expect(2.5 * frameMsPerUnit('ios')).toBe(2500);
     expect(2_500_000_000 * frameMsPerUnit('android')).toBeCloseTo(2500, 6);
+  });
+});
+
+describe('matchCandidates', () => {
+  // A fake game: strict matches by exact text, loose matches by text starting with "loose:".
+  const game = {
+    matchTitle(line: string, loose = false): CardMatch | null {
+      if (line === 'boom') throw new Error('boom');
+      if (line === 'Fireball') return match({ name: 'Fireball', lineUsed: 'fireball' });
+      if (loose && line.startsWith('loose:')) return match({ name: line.slice(6), match: 'tolerant' });
+      return null;
+    },
+  };
+
+  test('a strict match on any line beats a loose match on an earlier one', () => {
+    expect(matchCandidates(game, ['loose:Firebolt', 'Fireball'])).toMatchObject({
+      match: { name: 'Fireball' }, matchedText: 'Fireball',
+    });
+  });
+  test('falls back to a loose match when nothing matches strictly', () => {
+    expect(matchCandidates(game, ['junk', 'loose:Drought'])).toMatchObject({
+      match: { name: 'Drought', match: 'tolerant' }, matchedText: 'loose:Drought',
+    });
+  });
+  test('lists the lines that matched nothing, skipping one that threw', () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(matchCandidates(game, ['junk', 'boom', 'more junk'])).toEqual({
+      match: null, matchedText: '', noMatch: ['junk', 'more junk'],
+    });
+    warn.mockRestore();
   });
 });

@@ -9,7 +9,8 @@ export interface CardMatch {
 }
 
 export interface Game {
-  matchTitle(line: string): CardMatch | null;
+  /** A read title line's card; `loose` (camera reads) also accepts badly garbled reads. */
+  matchTitle(line: string, loose?: boolean): CardMatch | null;
   find(typed: string): CardMatch | null; // match: 'typed'
   suggest(typed: string, limit: number): string[]; // display names
   lookup(oracleIds: string[], minCents: number, order: SortOrder): CardGroup[];

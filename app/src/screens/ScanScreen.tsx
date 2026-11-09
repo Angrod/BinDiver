@@ -13,7 +13,7 @@ import {
   cameraZoom, cardOutline, titleBand, viewRectToFrameRegion, zoomToApply, type Rect, type Size,
 } from '../scan/geometry';
 import { titleCandidates, type OcrLine } from '../scan/lines';
-import { commitKey, qualifyingVersions } from '../scan/reading';
+import { commitKey, matchCandidates, qualifyingVersions } from '../scan/reading';
 import { normalizeLine, UnmatchedLines, type UnmatchedRow } from '../scan/unmatched';
 import { useTitleReader } from '../scan/useTitleReader';
 import { useAppData } from '../state/AppData';
@@ -191,25 +191,9 @@ export function ScanScreen() {
       }
       const g = gameRef.current;
       if (!g) return; // cards are loading or being swapped: skip the frame
-      // The top row joined, then each of its lines alone: the first match wins.
+      // The top row joined, then each of its lines alone: strict matches first, then loose ones.
       const candidates = titleCandidates(lines);
-      let match: CardMatch | null = null;
-      let matchedText = '';
-      const noMatch: string[] = [];
-      for (const candidate of candidates) {
-        try {
-          match = g.matchTitle(candidate);
-        } catch (e) {
-          console.warn('matchTitle failed', e);
-          match = null;
-          continue;
-        }
-        if (match !== null) {
-          matchedText = candidate;
-          break;
-        }
-        noMatch.push(candidate);
-      }
+      const { match, matchedText, noMatch } = matchCandidates(g, candidates);
       if (candidates.length > 0) {
         lastRead.current = match
           ? formatLastRead(normalizeLine(matchedText), match.name)

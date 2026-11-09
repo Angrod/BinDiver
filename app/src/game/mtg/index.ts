@@ -28,8 +28,8 @@ export function createMtgGame(db: Db): Game {
   }
 
   return {
-    matchTitle(line) {
-      const m = matchLine(index, line);
+    matchTitle(line, loose = false) {
+      const m = matchLine(index, line, loose);
       return m ? resolve(m.norm, m.kind, m.lineUsed) : null;
     },
     find,
