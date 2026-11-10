@@ -26,3 +26,15 @@ export function resultCardLines(model: ResultModel, shown: Shown, minCents: numb
   if (missing !== null) notes.push(missingVersionLine(missing.setCode, missing.collectorNumber, minCents));
   return { label: model.alert.label, name: match.name, count, notes };
 }
+
+/** The most lines a note wraps to on the card. */
+export const NOTE_MAX_LINES = 2;
+
+/**
+ * How many lines each note may wrap to: NOTE_MAX_LINES, fewer when the room left under the card's head (`spare`,
+ * in points) won't hold them, but never less than one. Each note takes `gap` above it and `lineHeight` a line.
+ */
+export function noteLines(spare: number, notes: number, lineHeight: number, gap: number): number {
+  const fit = Math.floor((spare / notes - gap) / lineHeight);
+  return Math.min(NOTE_MAX_LINES, Math.max(1, fit));
+}

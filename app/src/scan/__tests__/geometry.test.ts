@@ -1,6 +1,6 @@
 import {
   CAMERA_ZOOM_X, CARD_ASPECT, cameraHeight, cameraZoom, cardOutline, frameShape, isEarlyZoomError, titleBand,
-  viewRectToFrameRegion, zoomToApply, type Rect, type Size,
+  viewRectToFrameRegion, zoomToApply, type PercentRegion, type Rect, type Size,
 } from '../geometry';
 
 const IOS = frameShape('ios').aspect;
@@ -13,8 +13,8 @@ function expectRect(actual: Rect, e: Rect) {
   expect(actual.height).toBeCloseTo(e.height, 4);
 }
 
-/** The outline before Nov 10, when the camera took the top half: the card shape fitted to 88% of the view, centred. */
-function halfScreenOutline(view: Size): Rect {
+/** The camera test's outline (Plan 1, on `main`): the card shape fitted to 88% of the view, centred. */
+function cameraTestOutline(view: Size): Rect {
   const height = Math.min(0.88 * view.height, (0.88 * view.width) / CARD_ASPECT);
   const width = height * CARD_ASPECT;
   return { x: (view.width - width) / 2, y: (view.height - height) / 2, width, height };
@@ -25,6 +25,11 @@ function halfScreenOutline(view: Size): Rect {
 const IPHONE_13: Size = { width: 390, height: 703 };
 const PIXEL_8: Size = { width: 412, height: 807 };
 const IPHONE_SE: Size = { width: 375, height: 587 };
+/**
+ * The camera test's camera box on the iPhone 13: half the space below its one-line "Prices as of" strip
+ * (14 pt text, 16.71 pt tall, with 6 pt above and below) in the 763 pt safe area.
+ */
+const CAMERA_TEST_IPHONE_13: Size = { width: 390, height: (763 - 28.70703125) / 2 };
 
 describe('cameraHeight', () => {
   // Nov 10: the camera takes the screen below the top strip, but never more than the frame's own height at the
@@ -41,16 +46,16 @@ describe('cameraHeight', () => {
 });
 
 describe('cardOutline', () => {
-  // The outline keeps the size and place it had in the half-screen camera on Matt's iPhone 13 (test mode):
-  // 41% of the camera's width, card-shaped, centred, with its top 6.8% of its height below the camera's top.
-  it('is 41% of the camera width, card-shaped, centred and near the top on the iPhone 13', () => {
-    expectRect(cardOutline({ width: 390, height: 693.3333 }), { x: 115.05, y: 15.188, width: 159.9, height: 223.3524 });
+  // The camera test's outline (Matt's gate: 50 of 50, 2.54 s a card) was about 60% of the iPhone 13's width,
+  // centred in the camera and so in the frame, where the camera focuses and meters.
+  it('is 60% of the camera width, card-shaped and centred on the iPhone 13', () => {
+    expectRect(cardOutline({ width: 390, height: 693.3333 }), { x: 78, y: 183.2381, width: 234, height: 326.8571 });
   });
-  it('is the same shape and margin on the Pixel 8', () => {
-    expectRect(cardOutline({ width: 412, height: 549.3333 }), { x: 121.54, y: 16.0447, width: 168.92, height: 235.9517 });
+  it('is 60% of the camera width, card-shaped and centred on the Pixel 8', () => {
+    expectRect(cardOutline({ width: 412, height: 549.3333 }), { x: 82.4, y: 102.019, width: 247.2, height: 345.2952 });
   });
-  it("depends only on the camera's width, so the extra height only shows more of the table", () => {
-    expectRect(cardOutline({ width: 390, height: 587 }), cardOutline({ width: 390, height: 693.3333 }));
+  it('is at most 88% of a short camera view tall, narrowing to keep the card shape, still centred', () => {
+    expectRect(cardOutline({ width: 390, height: 300 }), { x: 100.5, y: 18, width: 189, height: 264 });
   });
 });
 
@@ -73,36 +78,37 @@ describe('titleBand', () => {
   });
 });
 
+/** Each edge of two frame regions, in percentage points apart. */
+function edgeGaps(a: PercentRegion, b: PercentRegion): number[] {
+  const n = (p: string) => parseFloat(p);
+  return [
+    n(a.left) - n(b.left), n(a.top) - n(b.top),
+    n(a.left) + n(a.width) - (n(b.left) + n(b.width)), n(a.top) + n(a.height) - (n(b.top) + n(b.height)),
+  ].map((d) => Math.abs(d));
+}
+
 describe('the title band in the full-height camera', () => {
-  // The half-screen camera on the iPhone 13 in test mode was 253.8 pt tall, which gave this same 159.9 pt outline.
-  // Its band read 44.28% of the frame's width and 7.09% of its height: the same share now, so the same part of the
-  // card at the same holding distance. Only its place in the frame moves up, as the camera now shows the whole frame.
-  it('reads the same share of the frame as the half-screen layout on the iPhone 13, now near the top', () => {
-    const before = { width: 390, height: 253.8095 };
-    expect(halfScreenOutline(before).width).toBeCloseTo(159.9, 3);
-    expect(viewRectToFrameRegion(titleBand(halfScreenOutline(before)), before, IOS)).toEqual({
-      left: '27.86%', top: '33.25%', width: '44.28%', height: '7.09%',
-    });
+  it('reads the frame region the camera test read on the iPhone 13', () => {
+    const before = viewRectToFrameRegion(titleBand(cameraTestOutline(CAMERA_TEST_IPHONE_13)), CAMERA_TEST_IPHONE_13, IOS);
+    expect(before).toEqual({ left: '17.97%', top: '25.77%', width: '64.05%', height: '10.25%' });
     const view = { width: 390, height: cameraHeight(IPHONE_13, IOS) };
-    expect(viewRectToFrameRegion(titleBand(cardOutline(view)), view, IOS)).toEqual({
-      left: '27.86%', top: '1.55%', width: '44.28%', height: '7.09%',
-    });
+    const now = viewRectToFrameRegion(titleBand(cardOutline(view)), view, IOS);
+    expect(now).toEqual({ left: '17.60%', top: '25.49%', width: '64.80%', height: '10.37%' });
+    // The same middle of the frame; each edge within 0.4 points (the outline is 234 pt against 231.3).
+    for (const gap of edgeGaps(now, before)) expect(gap).toBeLessThan(0.4);
   });
-  it('reads the same share of the frame as the half-screen layout on the Pixel 8, now near the top', () => {
-    const before = { width: 412, height: 268.127 };
-    expect(halfScreenOutline(before).width).toBeCloseTo(168.92, 3);
-    expect(viewRectToFrameRegion(titleBand(halfScreenOutline(before)), before, ANDROID)).toEqual({
-      left: '27.86%', top: '27.66%', width: '44.28%', height: '9.45%',
-    });
+  it('reads the frame region the Pixel 8 logged in the camera test', () => {
+    // logcat on update 01a1c2a4: scanRegion=ScanRegion(left=17.18, top=16.89, width=65.65, height=14.01)
+    const logged = { left: '17.18%', top: '16.89%', width: '65.65%', height: '14.01%' } as const;
     const view = { width: 412, height: cameraHeight(PIXEL_8, ANDROID) };
-    expect(viewRectToFrameRegion(titleBand(cardOutline(view)), view, ANDROID)).toEqual({
-      left: '27.86%', top: '2.06%', width: '44.28%', height: '9.45%',
-    });
+    const now = viewRectToFrameRegion(titleBand(cardOutline(view)), view, ANDROID);
+    expect(now).toEqual({ left: '17.60%', top: '17.31%', width: '64.80%', height: '13.83%' });
+    for (const gap of edgeGaps(now, logged)) expect(gap).toBeLessThan(0.5);
   });
-  it('keeps the cover scale on a short screen, where the frame is cropped top and bottom', () => {
+  it('reads the same region on a short screen, where the frame is cropped top and bottom', () => {
     const view = { width: 375, height: cameraHeight(IPHONE_SE, IOS) };
     expect(viewRectToFrameRegion(titleBand(cardOutline(view)), view, IOS)).toEqual({
-      left: '27.86%', top: '7.52%', width: '44.28%', height: '7.09%',
+      left: '17.60%', top: '25.49%', width: '64.80%', height: '10.37%',
     });
   });
 });
@@ -116,7 +122,7 @@ describe('viewRectToFrameRegion', () => {
   });
   it('maps the title band', () => {
     const view = { width: 390, height: 380 };
-    const band = titleBand(halfScreenOutline(view));
+    const band = titleBand(cameraTestOutline(view));
     expect(viewRectToFrameRegion(band, view, IOS)).toEqual({
       left: '16.85%', top: '24.92%', width: '66.30%', height: '10.61%',
     });
@@ -142,7 +148,7 @@ describe('frameShape', () => {
   it('maps the title band on a Pixel-shaped view to the scan region the Pixel 8 logged', () => {
     // logcat on update 01a1c2a4: scanRegion=ScanRegion(left=17.18, top=16.89, width=65.65, height=14.01)
     const view = { width: 412, height: 397.5 };
-    expect(viewRectToFrameRegion(titleBand(halfScreenOutline(view)), view, ANDROID)).toEqual({
+    expect(viewRectToFrameRegion(titleBand(cameraTestOutline(view)), view, ANDROID)).toEqual({
       left: '17.18%', top: '16.89%', width: '65.65%', height: '14.01%',
     });
   });

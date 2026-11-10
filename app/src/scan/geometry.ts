@@ -5,11 +5,11 @@ export interface PercentRegion { left: Percent; top: Percent; width: Percent; he
 
 export const CARD_ASPECT = 63 / 88; // width / height
 /**
- * The outline's width as a share of the camera's, and its top margin as a share of its own height: the size and
- * place it had when the camera took the top half of Matt's iPhone 13 (Nov 10), so the holding distance stays.
+ * The outline's width as a share of the camera's, at most this share of its height: about the size it had in
+ * the camera test (Plan 1, which passed Matt's gate), so the holding distance and the frame region read stay.
  */
-export const OUTLINE_WIDTH_SHARE = 0.41;
-export const OUTLINE_TOP = 0.068;
+export const OUTLINE_WIDTH_SHARE = 0.6;
+export const OUTLINE_HEIGHT_CAP = 0.88;
 // The title strip, as shares of the outline: from 2% above its top edge to 20% down, and 4% of its
 // width past each side. A title sits about 5-8% down a card; only the topmost line in the strip is read.
 export const BAND_TOP = -0.02;
@@ -87,11 +87,15 @@ export function cameraHeight(available: Size, frameAspect: number): number {
   return Math.min(available.height, available.width / frameAspect);
 }
 
-/** The card-shaped outline: a fixed share of the camera's width, centred across it, near its top. */
+/**
+ * The card-shaped outline: a share of the camera's width (narrower if a short view would make it too tall),
+ * centred in the view. The view shows the frame centred, so the card sits at the frame's centre, where the
+ * camera focuses and meters.
+ */
 export function cardOutline(view: Size): Rect {
-  const width = OUTLINE_WIDTH_SHARE * view.width;
-  const height = width / CARD_ASPECT;
-  return { x: (view.width - width) / 2, y: OUTLINE_TOP * height, width, height };
+  const height = Math.min(OUTLINE_HEIGHT_CAP * view.height, (OUTLINE_WIDTH_SHARE * view.width) / CARD_ASPECT);
+  const width = height * CARD_ASPECT;
+  return { x: (view.width - width) / 2, y: (view.height - height) / 2, width, height };
 }
 
 /** The title strip across the top of the outline. */

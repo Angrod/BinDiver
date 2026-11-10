@@ -4,7 +4,7 @@ import { createMtgGame } from '../../game/mtg';
 import { NO_MARKS, type KnownMarks } from '../../alert/alert';
 import type { CardMatch } from '../../game/types';
 import { resultModel, type Shown } from '../../scan/result';
-import { resultCardLines } from '../resultCard';
+import { noteLines, resultCardLines } from '../resultCard';
 
 const db = openNodeDb(path.join(__dirname, '../../game/mtg/__fixtures__/golden.sqlite'));
 afterAll(() => db.close());
@@ -90,5 +90,31 @@ describe('resultCardLines', () => {
 
   test('follows the price: Counterspell at $50+', () => {
     expect(lines(read('Counterspell'), { minCents: 5000 }).count).toBe('13 of 106 versions at $50+');
+  });
+});
+
+// The card sits under the outline and may reach the bottom safe area; when its notes won't fit there they
+// are cut to fewer lines (never hidden), so the card never has to grow up over the outline.
+describe('noteLines', () => {
+  const LINE = 18;
+  const GAP = 3;
+  test('gives a note its two lines when they fit', () => {
+    expect(noteLines(200, 1, LINE, GAP)).toBe(2);
+    expect(noteLines(39, 1, LINE, GAP)).toBe(2); // 3 + 2 x 18
+  });
+  test('cuts a note to one line when two would not fit', () => {
+    expect(noteLines(38.9, 1, LINE, GAP)).toBe(1);
+    expect(noteLines(21, 1, LINE, GAP)).toBe(1);
+  });
+  test('keeps one line even with no room left', () => {
+    expect(noteLines(0, 1, LINE, GAP)).toBe(1);
+    expect(noteLines(-40, 1, LINE, GAP)).toBe(1);
+  });
+  test('shares the room between two notes', () => {
+    expect(noteLines(78, 2, LINE, GAP)).toBe(2);
+    expect(noteLines(77, 2, LINE, GAP)).toBe(1);
+  });
+  test('counts the line height it is given, as scaled by a larger text size', () => {
+    expect(noteLines(39, 1, 27, GAP)).toBe(1);
   });
 });

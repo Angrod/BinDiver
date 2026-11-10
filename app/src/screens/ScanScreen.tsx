@@ -36,10 +36,15 @@ import { Icon } from './VersionRow';
 
 const DIAGNOSTICS_MS = 500; // the debug line and counters re-render at most this often
 const BAND = '#ff9f43';
-/** From the outline's bottom edge: the "Tap to pause" hint, then (further down) the space the result card may use. */
+/** The "Tap to pause" hint sits inside the outline, this far above its bottom edge. */
 const HINT_GAP = 8;
-const CARD_AREA_GAP = 32;
-/** The test-mode box's margin from the camera's left edge and from the title strip. */
+/** The result card's gap below the outline, and its margin above the bottom safe area. */
+const CARD_GAP = 16;
+const CARD_BOTTOM = 8;
+/** The Search button: round, beside the outline's lower right, just above the card. */
+const SEARCH_SIZE = 48;
+const SEARCH_RIGHT = 14;
+/** The test-mode box's margin from the camera's edges and from the title strip. */
 const TEST_BOX_MARGIN = 6;
 /** The camera frames' shape on this platform: the preview's, so the title strip is the area read. */
 const FRAME_ASPECT = frameShape(Platform.OS).aspect;
@@ -372,7 +377,7 @@ export function ScanScreen({ onOpenPrice, onOpenSettings }: Props) {
                   <Text style={styles.pausedText}>Paused</Text>
                 </View>
               )}
-              <View style={[styles.hintBox, { top: bottomOf(geometry.outline) + HINT_GAP }]}>
+              <View style={[styles.hintBox, { bottom: geometry.view.height - bottomOf(geometry.outline) + HINT_GAP }]}>
                 <Text style={styles.hint}>{paused ? 'Tap to resume' : 'Tap to pause'}</Text>
               </View>
             </Pressable>
@@ -390,13 +395,15 @@ export function ScanScreen({ onOpenPrice, onOpenSettings }: Props) {
           )}
           {cameraError !== null && <Text style={styles.cameraError}>{cameraError}</Text>}
 
-          {/* Test mode: beside the outline, left of the title strip. */}
+          {/* Test mode: across the top of the camera, above the title strip. */}
           {testMode && geometry !== null && (
-            <View style={[styles.testBox, { top: geometry.band.y, width: geometry.band.x - 2 * TEST_BOX_MARGIN }]}>
-              {frameSize && <Text style={styles.debug}>{formatFrameSize(frameSize, FRAME_ASPECT)}</Text>}
-              {diag.lastRead !== null && <Text style={styles.debug} numberOfLines={3}>{diag.lastRead}</Text>}
-              <Text style={styles.debug}>{diag.counters}</Text>
-              <Text style={styles.debug}>{updateStatus}</Text>
+            <View style={[styles.testBox, { maxHeight: geometry.band.y - 2 * TEST_BOX_MARGIN }]}>
+              <View style={styles.testLines}>
+                {frameSize && <Text style={styles.debug}>{formatFrameSize(frameSize, FRAME_ASPECT)}</Text>}
+                {diag.lastRead !== null && <Text style={styles.debug} numberOfLines={1}>{diag.lastRead}</Text>}
+                <Text style={styles.debug}>{diag.counters}</Text>
+                <Text style={styles.debug}>{updateStatus}</Text>
+              </View>
               {run !== null ? (
                 <View style={styles.runBar}>
                   <Text style={styles.runText}>
@@ -410,23 +417,28 @@ export function ScanScreen({ onOpenPrice, onOpenSettings }: Props) {
             </View>
           )}
 
-          {/* Search and the result card, over the camera's lower part: never above the space below the outline. */}
-          <View style={[styles.cardArea, geometry !== null && { top: bottomOf(geometry.outline) + CARD_AREA_GAP }]}
-            pointerEvents="box-none">
+          {geometry !== null && (
             <Pressable
-              style={[styles.search, { backgroundColor: theme.panel, borderColor: theme.border }, game === null && styles.disabled]}
+              style={[styles.search, { top: bottomOf(geometry.outline) - SEARCH_SIZE },
+                { backgroundColor: theme.panel, borderColor: theme.border }, game === null && styles.disabled]}
               onPress={() => setSearchOpen(true)}
               disabled={game === null}
               accessibilityRole="button"
               accessibilityLabel="Search"
               accessibilityState={{ disabled: game === null }}
             >
-              <Icon name="search" size={16} color={theme.text} />
-              <Text style={[styles.searchText, { color: theme.text }]}>Search</Text>
+              <Icon name="search" size={20} color={theme.text} />
             </Pressable>
-            <ResultCard shown={shown} onOpen={openList} />
-          </View>
+          )}
         </View>
+
+        {/* The result card: under the outline, down to the bottom safe area if it needs to (cutting its notes first). */}
+        {geometry !== null && area !== null && (
+          <View style={[styles.cardArea, { top: bottomOf(geometry.outline) + CARD_GAP }]} pointerEvents="box-none">
+            <ResultCard shown={shown} onOpen={openList}
+              room={area.height - CARD_BOTTOM - (bottomOf(geometry.outline) + CARD_GAP)} />
+          </View>
+        )}
       </View>
 
       <PriceSheet visible={priceOpen} onClose={() => setPriceOpen(false)} />
@@ -490,19 +502,21 @@ const styles = StyleSheet.create({
   cameraMessage: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 },
   messageText: { color: '#fff', fontSize: 17, textAlign: 'center' },
   cameraError: { position: 'absolute', top: 6, left: 8, right: 8, color: '#f88', fontSize: 12 },
+  // maxHeight and overflow: the box is cut rather than reach the title strip.
   testBox: {
-    position: 'absolute', left: TEST_BOX_MARGIN, padding: 6, gap: 2, borderRadius: 8,
-    backgroundColor: 'rgba(0,0,0,0.55)',
+    position: 'absolute', top: TEST_BOX_MARGIN, left: TEST_BOX_MARGIN, right: TEST_BOX_MARGIN, overflow: 'hidden',
+    padding: 4, borderRadius: 8, backgroundColor: 'rgba(0,0,0,0.55)',
+    flexDirection: 'row', alignItems: 'flex-start', gap: 8,
   },
+  testLines: { flex: 1, gap: 1 },
   debug: { fontSize: 11, color: 'rgba(255,255,255,0.85)' },
-  runBar: { alignItems: 'flex-start' },
-  runText: { fontSize: 15, color: '#fff', fontVariant: ['tabular-nums'] },
-  // flex-end: Search sits on the card, both at the bottom; the card shrinks rather than rise past the top.
-  cardArea: { position: 'absolute', left: 10, right: 10, bottom: 10, justifyContent: 'flex-end', gap: 8 },
+  runBar: { alignItems: 'center' },
+  runText: { fontSize: 13, color: '#fff', fontVariant: ['tabular-nums'] },
   search: {
-    alignSelf: 'flex-end', height: 46, paddingHorizontal: 16, borderRadius: 999, borderWidth: 1,
-    flexDirection: 'row', alignItems: 'center', gap: 8,
+    position: 'absolute', right: SEARCH_RIGHT, width: SEARCH_SIZE, height: SEARCH_SIZE, borderRadius: SEARCH_SIZE / 2,
+    borderWidth: 1, alignItems: 'center', justifyContent: 'center',
   },
-  searchText: { fontSize: 14, fontWeight: '500' },
   disabled: { opacity: 0.5 },
+  // Top-anchored under the outline; overflow: anything past the bottom safe area is cut, never moved up.
+  cardArea: { position: 'absolute', left: 10, right: 10, bottom: CARD_BOTTOM, overflow: 'hidden' },
 });
