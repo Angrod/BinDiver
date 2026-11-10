@@ -19,7 +19,7 @@ import { createUserStore, UserStore } from '../user/store';
 export type Phase = 'starting' | 'loading' | 'setup' | 'ready';
 
 export const LAST_CHECK_ERROR = 'last_check_error';
-const APP_TOO_OLD = 'Update the app to get newer prices';
+export const APP_TOO_OLD = 'Update the app to get newer prices';
 
 export interface AppDataValue {
   game: Game | null;

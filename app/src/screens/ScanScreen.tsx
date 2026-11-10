@@ -25,9 +25,11 @@ import { useUpdateStatus } from '../updates/useUpdateStatus';
 import type { TestRun } from '../user/store';
 import { formatCounters, formatElapsed, formatFrameSize, formatLastRead } from './format';
 import { ResultPanel } from './ResultPanel';
+import { PriceSheet } from './PriceSheet';
 import { RunScreen } from './RunScreen';
 import { BottomBar, TopStrip } from './ScanBars';
 import { SearchSheet } from './SearchSheet';
+import { SettingsScreen } from './SettingsScreen';
 import { useTheme } from './theme';
 
 const DIAGNOSTICS_MS = 500; // the debug line and counters re-render at most this often
@@ -73,6 +75,8 @@ export function ScanScreen({ onOpenPrice, onOpenSettings }: Props) {
   const [paused, setPaused] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [runOpen, setRunOpen] = useState(false);
+  const [priceOpen, setPriceOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [frameSize, setFrameSize] = useState<Size | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
 
@@ -323,7 +327,8 @@ export function ScanScreen({ onOpenPrice, onOpenSettings }: Props) {
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: theme.bg }]}>
       <TopStrip theme={theme} priceDate={priceDate} minCents={settings.minCents}
-        onOpenPrice={onOpenPrice} onOpenSettings={onOpenSettings} />
+        onOpenPrice={() => { setPriceOpen(true); onOpenPrice?.(); }}
+        onOpenSettings={() => { setSettingsOpen(true); onOpenSettings?.(); }} />
 
       <View style={[styles.cameraBox, { backgroundColor: theme.camera }]} onLayout={onCameraLayout}>
         {hasPermission && device !== undefined && geometry !== null && (
@@ -400,6 +405,8 @@ export function ScanScreen({ onOpenPrice, onOpenSettings }: Props) {
       <BottomBar theme={theme} settings={settings} setSetting={setSetting}
         onSearch={() => setSearchOpen(true)} searchDisabled={game === null} />
 
+      <PriceSheet visible={priceOpen} onClose={() => setPriceOpen(false)} />
+      <SettingsScreen visible={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <SearchSheet visible={searchOpen} onPick={onPick} onCancel={() => setSearchOpen(false)} />
       <RunScreen
         visible={runOpen}

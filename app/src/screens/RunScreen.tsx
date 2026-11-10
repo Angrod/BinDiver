@@ -8,10 +8,27 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { unmatchedToCsv, type UnmatchedRow } from '../scan/unmatched';
 import { useAppData } from '../state/AppData';
 import { runToCsv, summarizeRun } from '../user/runReport';
-import type { Scan, TestRun } from '../user/store';
+import type { Scan, TestRun, UserStore } from '../user/store';
 import { formatReadRight, formatSecondsPerCard, parseStackCount, showsReadAs, timeOfDay } from './format';
 
 const UNMATCHED_SHOWN = 50;
+
+/** Writes a CSV to the cache and opens the share sheet; a failure shows an alert. */
+async function shareCsvFile(name: string, csv: () => string): Promise<void> {
+  try {
+    const file = new File(Paths.cache, name);
+    file.create({ overwrite: true });
+    await file.write(csv());
+    await Sharing.shareAsync(file.uri, { mimeType: 'text/csv' });
+  } catch (e) {
+    Alert.alert('Export failed', e instanceof Error ? e.message : String(e));
+  }
+}
+
+/** Shares one run's scans as a CSV. */
+export function shareRunCsv(user: UserStore, runId: number): Promise<void> {
+  return shareCsvFile(`bindiver-run-${runId}.csv`, () => runToCsv(user.runScans(runId)));
+}
 
 interface Props {
   visible: boolean;
@@ -49,16 +66,10 @@ export function RunScreen({ visible, unmatched, onStart, onClose }: Props) {
 
   const unmatchedRows = last && unmatched?.runId === last.id ? unmatched.rows : null;
 
-  /** Writes a CSV to the cache and opens the share sheet. */
   const shareCsv = async (name: string, csv: () => string) => {
     setExporting(true);
     try {
-      const file = new File(Paths.cache, name);
-      file.create({ overwrite: true });
-      await file.write(csv());
-      await Sharing.shareAsync(file.uri, { mimeType: 'text/csv' });
-    } catch (e) {
-      Alert.alert('Export failed', e instanceof Error ? e.message : String(e));
+      await shareCsvFile(name, csv);
     } finally {
       setExporting(false);
     }
@@ -66,7 +77,12 @@ export function RunScreen({ visible, unmatched, onStart, onClose }: Props) {
   const exportRun = async () => {
     if (!last) return;
     const id = last.id;
-    await shareCsv(`bindiver-run-${id}.csv`, () => runToCsv(user.runScans(id)));
+    setExporting(true);
+    try {
+      await shareRunCsv(user, id);
+    } finally {
+      setExporting(false);
+    }
   };
   const exportUnmatched = async () => {
     if (!last || !unmatchedRows) return;
