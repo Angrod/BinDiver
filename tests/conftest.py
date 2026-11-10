@@ -9,8 +9,10 @@ from bindiver.mtg.lookup import Catalog
 
 FIXTURES = Path(__file__).parent / "fixtures"
 FIXTURE = FIXTURES / "cards.json"
-CS_SETS = [{"code": "7ed", "name": "Seventh Edition", "icon_svg_uri": "https://svgs.scryfall.io/sets/7ed.svg"},
-           {"code": "lea", "name": "Limited Edition Alpha", "icon_svg_uri": "https://svgs.scryfall.io/sets/lea.svg"}]
+CS_SETS = [{"code": "7ed", "name": "Seventh Edition", "printed_size": 350, "card_count": 708,
+            "icon_svg_uri": "https://svgs.scryfall.io/sets/7ed.svg"},
+           {"code": "lea", "name": "Limited Edition Alpha", "card_count": 295,
+            "icon_svg_uri": "https://svgs.scryfall.io/sets/lea.svg"}]
 
 
 @pytest.fixture

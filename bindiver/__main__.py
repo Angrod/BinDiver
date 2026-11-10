@@ -1,6 +1,7 @@
 """BinDiver command line.
 
     python -m bindiver update                  # fetch Scryfall data (max once a day) and rebuild
+    python -m bindiver update --offline        # rebuild from the saved files, no network
     python -m bindiver lookup "Fireball" --min 10 --sort price   # oldest (default), newest or price
     python -m bindiver report scan.csv --min 5 --min 10 --min 20
     python -m bindiver coverage scan.csv --min 10
@@ -10,13 +11,13 @@
 """
 
 import argparse
+import json
 import sys
 import time
-from datetime import datetime
 from pathlib import Path
 
 from bindiver.mtg.build_db import build_db, iter_bulk
-from bindiver.mtg.bulk_data import BULK_FILE, fetch_set_icons, read_local_meta, update, update_sets
+from bindiver.mtg.bulk_data import BULK_FILE, SETS_FILE, fetch_set_icons, price_date_of, read_local_meta, update, update_sets
 from bindiver.mtg.golden import write_golden
 from bindiver.mtg.hand_notes import HAND_NOTES_FILE
 from bindiver.mtg.lookup import SORT_ORDERS, Catalog
@@ -29,11 +30,26 @@ DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 DB_FILE = DATA_DIR / "cards.sqlite"
 
 
+def _saved_data():
+    """The saved bulk metadata and set list, or None when either is missing."""
+    meta = read_local_meta(DATA_DIR)
+    sets_path = DATA_DIR / SETS_FILE
+    if meta is None or not sets_path.exists():
+        return None
+    return meta, json.loads(sets_path.read_text(encoding="utf-8"))["data"]
+
+
 def cmd_update(args):
-    meta = update(DATA_DIR)
-    sets = update_sets(DATA_DIR)
-    price_date = datetime.fromisoformat(meta["updated_at"]).date().isoformat()
-    if needs_rebuild(args.force_build, DB_FILE.exists(), _db_price_date(), price_date,
+    if args.offline:
+        saved = _saved_data()
+        if saved is None:
+            sys.exit("No saved Scryfall data. Run: python -m bindiver update")
+        meta, sets = saved
+    else:
+        meta = update(DATA_DIR)
+        sets = update_sets(DATA_DIR)
+    price_date = price_date_of(meta["updated_at"])
+    if needs_rebuild(args.force_build or args.offline, DB_FILE.exists(), _db_price_date(), price_date,
                      _mtime(DB_FILE), _mtime(HAND_NOTES_FILE)):
         start = time.perf_counter()
         build_db(iter_bulk(DATA_DIR / BULK_FILE), DB_FILE, price_date=price_date, sets=sets)
@@ -160,6 +176,8 @@ def main(argv=None):
 
     p = sub.add_parser("update", help="download Scryfall data (at most daily) and rebuild the database")
     p.add_argument("--force-build", action="store_true", help="rebuild even if prices haven't changed")
+    p.add_argument("--offline", action="store_true",
+                   help="rebuild from the saved Scryfall files, with no network call")
     p.set_defaults(func=cmd_update)
 
     p = sub.add_parser("lookup", help="list versions of a card at or above a price")

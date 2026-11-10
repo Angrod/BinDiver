@@ -37,6 +37,7 @@ class Version:
     same_as: tuple[str, ...] = ()
     symbol_set: str | None = None
     symbol_icon: str | None = None
+    quiet_kind: str = ""
 
     @property
     def key(self) -> str:
@@ -141,7 +142,8 @@ class Catalog:
             SELECT p.id, p.name, p.set_code, p.set_name, p.collector_number,
                    p.released_at, p.lang, v.finish, v.price_cents,
                    v.frame_group, v.look_for, v.notes, v.same_as, p.symbol_set,
-                   CASE WHEN p.symbol_set = 'none' THEN NULL ELSE s.icon_svg_uri END
+                   CASE WHEN p.symbol_set = 'none' THEN NULL ELSE s.icon_svg_uri END,
+                   v.quiet_kind
             FROM printings p JOIN versions v ON v.printing_id = p.id
                  LEFT JOIN sets s ON s.code = p.symbol_set
             WHERE p.oracle_id = ?
@@ -154,7 +156,7 @@ class Catalog:
                 scryfall_id=r[0], set_code=r[2], set_name=r[3], collector_number=r[4],
                 released_at=r[5], lang=r[6], finish=r[7], price_cents=r[8],
                 frame_group=r[9], look_for=r[10], notes=tuple(r[11].split("\n")) if r[11] else (),
-                same_as=tuple(json.loads(r[12])), symbol_set=r[13], symbol_icon=r[14],
+                same_as=tuple(json.loads(r[12])), symbol_set=r[13], symbol_icon=r[14], quiet_kind=r[15],
             )
             for r in rows
         ]

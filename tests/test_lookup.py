@@ -184,3 +184,8 @@ def test_same_set_versions_go_by_collector_number_then_nonfoil_foil_etched():
 def test_sort_versions_rejects_an_unknown_order():
     with pytest.raises(ValueError):
         sort_versions([], "cheapest")
+
+
+def test_lookup_carries_each_versions_quiet_kind(cs_catalog):
+    group = only_group(cs_catalog.lookup("Counterspell", 25))
+    assert {v.set_code: v.quiet_kind for v in group.qualifying}["leb"] == "old border"
