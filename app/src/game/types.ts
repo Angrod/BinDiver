@@ -1,6 +1,7 @@
 import type { CardGroup, SortOrder } from './mtg/types';
 
 export type { CardGroup, SortOrder, Version } from './mtg/types';
+export { dollars } from './mtg/money';
 
 export interface KnownCard {
   oracleId: string;
