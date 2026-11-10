@@ -64,7 +64,14 @@ test('quietKinds are the three labels in order', () => {
   expect(game.quietKinds).toEqual(['old border', 'Secret Lair', 'serialized']);
 });
 test('numberSearch is on for the golden data', () => expect(game.numberSearch).toBe(true));
-test('explore at 1000 cents carries each version\'s quiet kind', () => {
+test('Explore at 1000 cents: every qualifying version is Secret Lair', () => {
+  const c = cases.find((x) => x.query === 'Explore' && x.min_cents === 1000 && x.order === 'oldest')!;
+  expect(c).toBeDefined();
+  const quals = game.lookup(c.groups.map((g) => g.oracle_id), 1000, 'oldest').flatMap((g) => g.qualifying);
+  expect(quals.length).toBeGreaterThan(0);
+  expect(quals.every((v) => v.quietKind === 'Secret Lair')).toBe(true);
+});
+test('lookup carries each version quiet kind from the data', () => {
   const ids = db.all<{ oracle_id: string }>(
     `SELECT DISTINCT p.oracle_id FROM printings p JOIN versions v ON v.printing_id = p.id
      WHERE v.quiet_kind = 'Secret Lair' AND v.price_cents >= 1000`,
