@@ -26,11 +26,11 @@ Hold the phone over a card in a bin. Within seconds, see which of that card's ve
 - **From the mockup (approved):** collector numbers on rows whose set names repeat, alert rates on the price presets, and a dark look that follows the phone's light or dark setting.
 
 **Decisions made with Matt for Plan 2 (Nov 9, after the camera test):**
-- **Quiet alert for old-border cards.** When every version at the price is an old-border printing (printed through Scourge, 2003), the result shows without vibration or sound (section 3.2). Retro-frame reprints still alert in full. In the camera runs, this cut buzzes from 30 to 14 per 142 cards.
+- **Quiet alert for old-border, Secret Lair and serialized cards.** When every version at the price is one of these, the result shows without vibration or sound (section 3.2): an old-border printing (printed through Scourge, 2003), a Secret Lair version, or a serialized one. Retro-frame reprints, showcase and borderless versions still alert in full. In the camera runs, this cut buzzes from 30 to 11 per 142 cards.
 - **Basic lands start as known** (section 4.1), including the snow-covered basics and Wastes.
 - **Foreign cards** can be looked up by set code and collector number (2014 on) and by "number/total" plus artist (1998 to 2014), as well as by English name (section 3.1). Camera reading stays English-only.
 - **The iPhone 15 Pro** joins the iPhone 13 and the Pixel 8 for the phone tests. It needs registering (`eas device:create`) before Plan 2's builds.
-- **Quieting other special versions** (borderless, showcase, serialized) waits for the 200-card test's alert numbers. In the camera runs it would have cut buzzes from 14 to 4 per 142 cards.
+- **Quieting showcase and borderless versions too** waits for the 200-card test's alert numbers. In the camera runs it would have cut buzzes from 11 to 9 per 142 cards.
 
 **Not in Phase 3:** the watchlist and price refetch (Phase 4), reading non-English titles with the camera, art recognition, an App Store or Play Store release, accounts, analytics, condition.
 
@@ -52,7 +52,7 @@ A new command, `python -m bindiver phone-db`, writes a slimmed copy of `data/car
 | --- | --- |
 | `meta` | As now (`price_date` and the rest), plus `phone_format` = `1` |
 | `printings` | Only `id`, `oracle_id`, `name`, `set_code`, `set_name`, `collector_number`, `released_at`, `lang`, `symbol_set`, with the `printings_oracle` index. Plan 2 adds `artist_id` and an index on `(set_code, collector_number)` |
-| `versions` | As now |
+| `versions` | As now. Plan 2 adds `quiet_kind`: `old border` (`frame_group` `old-1993` or `old-1997`), `Secret Lair` (a set whose name starts "Secret Lair": `sld`, `slc`, `slp`, `slu`, `pssc`) or `serialized` (`promo_types` includes `serialized`), checked in that order; empty for every other version |
 | `names` | As now |
 | `sets` | `code`, `name`, and `icon_svg` (the icon's SVG text, embedded so the phone never fetches icons). Plan 2 adds `printed_total`: Scryfall's `printed_size`, or `card_count` when that is missing (only 169 of 1,067 sets have `printed_size`; M15 prints 269 but has a `card_count` of 284) |
 | `artists` (Plan 2) | `id`, `name`: each artist stored once (2,561 names for about 105k printings) |
@@ -248,9 +248,9 @@ Portrait, one hand. The mockup's five boards show each state.
 
 - **When:** a newly read card has at least one *priced* version at or above the price, and isn't muted as known (section 4.1). Versions with no price never trigger an alert.
 - **Two strengths (from Plan 2):**
-  - **Full alert:** at least one of those versions is *not* an old-border printing. This gives the orange border, the "Worth finding" label, and the signal.
-  - **Quiet alert:** every one of those versions is an old-border printing, meaning its `frame_group` is `old-1993` or `old-1997` (printed through Scourge, 2003). This gives a thinner amber outline and the label "Old border only · 3 versions at $10+", with no vibration or sound. Old borders are easy to rule out by eye.
-  - Retro-frame reprints (`frame_group` `retro`: 30th Anniversary, the Remastered sets, Modern Horizons, Time Spiral Timeshifted) count as full alerts, because they are modern products found in modern bins.
+  - **Full alert:** at least one of those versions has an empty `quiet_kind` (section 1.1). This gives the orange border, the "Worth finding" label, and the signal.
+  - **Quiet alert:** every one of those versions has a `quiet_kind`: an old-border printing (printed through Scourge, 2003), a Secret Lair version, or a serialized one. This gives a thinner amber outline, no vibration or sound, and a label naming the kinds, such as "Old border only · 3 versions at $10+" or "Old border or Secret Lair only · 4 versions at $10+". These are easy to rule out by eye (the old frame, the Secret Lair set symbol, the stamped serial number), and Secret Lair and serialized cards rarely reach bulk bins.
+  - Retro-frame reprints (`frame_group` `retro`: 30th Anniversary, the Remastered sets, Modern Horizons, Time Spiral Timeshifted), showcase and borderless versions count as full alerts, because they are modern products found in modern bins.
   - For a known card, the same rule runs over its kept versions only.
 - **On screen:**
   - The result panel gets a thick orange border and a "Worth finding" label.
@@ -363,7 +363,7 @@ None of these carries Matt's data: the update check's install ID is random, not 
 3. **Phone versus Mac:** Matt exports the run, and `python -m bindiver check-log run.csv` replays every read through the Python lookup at the run's price setting. It lists any card where the phone and the Mac disagree on alerting, and warns if their price dates differ.
 4. **Shop or dim light:** a mixed stack in a shop or a poorly lit room. Every card the camera misses or misreads must be found by typed search. All of them.
 5. **Android and the iPhone 15 Pro:** the 200-card stack on the Pixel 8 and the iPhone 15 Pro as well. The iPhone 13 result decides the phase.
-6. **Alert numbers:** the 200-card run records how many cards give a full alert, a quiet alert and none. It also records how many full alerts come only from borderless, showcase or serialized versions. Whether those go quiet too is decided from these numbers.
+6. **Alert numbers:** the 200-card run records how many cards give a full alert, a quiet alert and none. It also records how many full alerts come only from showcase or borderless versions. Whether those go quiet too is decided from these numbers.
 
 Results are recorded in `BUILD_BREAKDOWN.md`, as for Phases 1 and 2.
 
