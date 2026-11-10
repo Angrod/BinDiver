@@ -3,6 +3,7 @@ import {
   Pressable, ScrollView, StyleSheet, Text, View, type LayoutChangeEvent, type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native';
+import type { AlertKind } from '../alert/alert';
 import type { CardGroup, Game } from '../game/types';
 import { missingVersion, resultModel, type ResultModel, type Shown } from '../scan/result';
 import { useAppData } from '../state/AppData';
@@ -37,7 +38,7 @@ function iconCache(game: Game | null): (code: string | null) => string | null {
 }
 
 /**
- * The bottom half of the scan screen: the shown card at the current price, sort and known marks.
+ * The full list (in the sheet the result card opens): the shown card at the current price, sort and known marks.
  *
  * This component only draws. It recomputes the result in a useMemo whenever the price, the sort or a
  * known mark changes, and it never records a scan or signals an alert: only the scan screen's commit
@@ -155,7 +156,7 @@ export const ResultPanel = memo(function ResultPanel({ shown }: Props) {
       <ScrollView contentContainerStyle={styles.content} onScroll={onScroll} scrollEventThrottle={16}>
         {(alert.label !== null || !several) && (
           <View style={styles.chipRow}>
-            <Label alert={alert} theme={theme} />
+            <Label kind={alert.kind} label={alert.label} theme={theme} />
             {groups.length === 1 && markButton(groups[0])}
           </View>
         )}
@@ -223,16 +224,19 @@ export const ResultPanel = memo(function ResultPanel({ shown }: Props) {
   );
 });
 
-/** The result's label: a chip for a full alert or a known card with nothing alerting, text for a quiet one. */
-function Label({ alert, theme }: { alert: ResultModel['alert']; theme: Theme }): ReactNode {
-  if (alert.label === null) return <View />;
-  if (alert.kind === 'quiet') {
-    return <Text style={[styles.quietLabel, { color: theme.quiet }]}>{alert.label}</Text>;
+/**
+ * The result's label (the alert's, or the result card's): a chip for a full alert or a known card with nothing
+ * alerting, text for a quiet one.
+ */
+export function Label({ kind, label, theme }: { kind: AlertKind; label: string | null; theme: Theme }): ReactNode {
+  if (label === null) return <View />;
+  if (kind === 'quiet') {
+    return <Text style={[styles.quietLabel, { color: theme.quiet }]}>{label}</Text>;
   }
-  const full = alert.kind === 'full';
+  const full = kind === 'full';
   return (
     <View style={[styles.chip, { backgroundColor: full ? theme.accent : theme.border }]}>
-      <Text style={[styles.chipText, { color: full ? theme.onAccent : theme.text }]}>{alert.label}</Text>
+      <Text style={[styles.chipText, { color: full ? theme.onAccent : theme.text }]}>{label}</Text>
     </View>
   );
 }

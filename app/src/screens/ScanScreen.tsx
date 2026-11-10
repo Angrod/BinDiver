@@ -11,7 +11,7 @@ import { useAlertSignal } from '../alert/useAlertSignal';
 import type { CardMatch } from '../game/types';
 import { CommitTracker } from '../scan/commit';
 import {
-  cameraZoom, cardOutline, frameShape, isEarlyZoomError, titleBand, viewRectToFrameRegion, zoomToApply,
+  cameraHeight, cameraZoom, cardOutline, frameShape, isEarlyZoomError, titleBand, viewRectToFrameRegion, zoomToApply,
   type Rect, type Size,
 } from '../scan/geometry';
 import type { OcrLine } from '../scan/lines';
@@ -24,16 +24,23 @@ import { useAppData } from '../state/AppData';
 import { useUpdateStatus } from '../updates/useUpdateStatus';
 import type { TestRun } from '../user/store';
 import { formatCounters, formatElapsed, formatFrameSize, formatLastRead } from './format';
-import { ResultPanel } from './ResultPanel';
 import { PriceSheet } from './PriceSheet';
+import { ResultCard } from './ResultCardView';
+import { ResultSheet } from './ResultSheet';
 import { RunScreen } from './RunScreen';
-import { BottomBar, TopStrip } from './ScanBars';
+import { TopStrip } from './ScanBars';
 import { SearchSheet } from './SearchSheet';
 import { SettingsScreen } from './SettingsScreen';
 import { useTheme } from './theme';
+import { Icon } from './VersionRow';
 
 const DIAGNOSTICS_MS = 500; // the debug line and counters re-render at most this often
 const BAND = '#ff9f43';
+/** From the outline's bottom edge: the "Tap to pause" hint, then (further down) the space the result card may use. */
+const HINT_GAP = 8;
+const CARD_AREA_GAP = 32;
+/** The test-mode box's margin from the camera's left edge and from the title strip. */
+const TEST_BOX_MARGIN = 6;
 /** The camera frames' shape on this platform: the preview's, so the title strip is the area read. */
 const FRAME_ASPECT = frameShape(Platform.OS).aspect;
 
@@ -77,6 +84,8 @@ export function ScanScreen({ onOpenPrice, onOpenSettings }: Props) {
   const [runOpen, setRunOpen] = useState(false);
   const [priceOpen, setPriceOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [listOpen, setListOpen] = useState(false);
+  const openList = useCallback(() => setListOpen(true), []);
   const [frameSize, setFrameSize] = useState<Size | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
 
@@ -136,25 +145,27 @@ export function ScanScreen({ onOpenPrice, onOpenSettings }: Props) {
     checkZoom();
   }, [checkZoom]);
 
-  // Geometry: only once the camera view has a real size (a zero size would give NaN% regions).
-  const [viewSize, setViewSize] = useState<Size | null>(null);
-  const onCameraLayout = useCallback((e: LayoutChangeEvent) => {
+  // Geometry: only once the space below the top strip has a real size (a zero size would give NaN% regions).
+  // The camera view takes that space, but no more than the frame's height at its width (page background below).
+  const [area, setArea] = useState<Size | null>(null);
+  const onAreaLayout = useCallback((e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
     if (width > 0 && height > 0) {
-      setViewSize((prev) => (prev && prev.width === width && prev.height === height ? prev : { width, height }));
+      setArea((prev) => (prev && prev.width === width && prev.height === height ? prev : { width, height }));
     }
   }, []);
   const geometry = useMemo(() => {
-    if (!viewSize) return null;
-    const outline = cardOutline(viewSize);
+    if (!area) return null;
+    const view = { width: area.width, height: cameraHeight(area, FRAME_ASPECT) };
+    const outline = cardOutline(view);
     const band = titleBand(outline);
-    return { outline, band, region: viewRectToFrameRegion(band, viewSize, FRAME_ASPECT) };
-  }, [viewSize]);
+    return { view, outline, band, region: viewRectToFrameRegion(band, view, FRAME_ASPECT) };
+  }, [area]);
 
-  // The camera (and with it the reader) is off while the Search, Run, Price or Settings sheet is open,
-  // as well as when paused by a tap or with the app in the background.
+  // The camera (and with it the reader) is off while the Search, Run, Price, Settings or full-list sheet is
+  // open, as well as when paused by a tap or with the app in the background.
   const cameraOn = hasPermission && device !== undefined && geometry !== null && appActive && !paused
-    && !searchOpen && !runOpen && !priceOpen && !settingsOpen;
+    && !searchOpen && !runOpen && !priceOpen && !settingsOpen && !listOpen;
 
   /** A matched card's result at the current settings; null if the game is gone or the lookup throws. */
   const modelFor = useCallback((m: CardMatch): ResultModel | null => {
@@ -172,7 +183,7 @@ export function ScanScreen({ onOpenPrice, onOpenSettings }: Props) {
   /**
    * A newly read or picked card. This is the only place a scan is recorded and an alert signalled, and
    * only the camera commit and the search pick call it. A new price, sort or known mark redraws the
-   * panel (ResultPanel's useMemo) and never comes here.
+   * card and the list (ResultCard's and ResultPanel's useMemo) and never comes here.
    */
   const commitResult = useCallback(
     (m: CardMatch, model: ResultModel, source: 'camera' | 'search', rawText: string, readMs: number | null,
@@ -322,92 +333,106 @@ export function ScanScreen({ onOpenPrice, onOpenSettings }: Props) {
     setRunOpen(true);
   };
 
-  const debug = [styles.debug, { color: theme.muted }];
-
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: theme.bg }]}>
       <TopStrip theme={theme} priceDate={priceDate} minCents={settings.minCents}
         onOpenPrice={() => { setPriceOpen(true); onOpenPrice?.(); }}
         onOpenSettings={() => { setSettingsOpen(true); onOpenSettings?.(); }} />
 
-      <View style={[styles.cameraBox, { backgroundColor: theme.camera }]} onLayout={onCameraLayout}>
-        {hasPermission && device !== undefined && geometry !== null && (
-          <Camera
-            ref={cameraRef}
-            style={StyleSheet.absoluteFill}
-            device={device}
-            isActive={cameraOn}
-            outputs={[frameOutput]}
-            constraints={[{ resolutionBias: frameOutput }]}
-            // The app is portrait-only: follow the interface, not the accelerometer, so tilting the
-            // phone over a bin never rotates the frames (and the OCR crop) away from the title band.
-            orientationSource="interface"
-            zoom={zoom}
-            resizeMode="cover"
-            onError={onCameraError}
-            onStarted={onCameraStarted}
-          />
-        )}
-        {hasPermission && geometry !== null && (
-          <Pressable
-            style={StyleSheet.absoluteFill}
-            onPress={() => setPaused((p) => !p)}
-            accessibilityRole="button"
-            accessibilityLabel={paused ? 'Resume scanning' : 'Pause scanning'}
-          >
-            <View style={[styles.outline, box(geometry.outline)]} />
-            <View style={[styles.band, box(geometry.band)]} />
-            {paused && (
-              <View style={styles.pausedCover}>
-                <Text style={styles.pausedText}>Paused</Text>
-              </View>
-            )}
-            <View style={styles.hintBox}>
-              <Text style={styles.hint}>{paused ? 'Tap to resume' : 'Tap to pause'}</Text>
-            </View>
-          </Pressable>
-        )}
-        {!hasPermission && !canRequestPermission && (
-          <View style={styles.cameraMessage}>
-            <Text style={styles.messageText}>BinDiver needs the camera to read card titles.</Text>
-            <Button title="Open Settings" onPress={() => void Linking.openSettings()} />
-          </View>
-        )}
-        {hasPermission && device === undefined && (
-          <View style={styles.cameraMessage}>
-            <Text style={styles.messageText}>No camera found.</Text>
-          </View>
-        )}
-        {cameraError !== null && <Text style={styles.cameraError}>{cameraError}</Text>}
-      </View>
-
-      <ResultPanel key={shownId} shown={shown} />
-
-      {testMode && (
-        <View style={styles.testBlock}>
-          {frameSize && <Text style={debug}>{formatFrameSize(frameSize, FRAME_ASPECT)}</Text>}
-          {diag.lastRead !== null && <Text style={debug} numberOfLines={1}>{diag.lastRead}</Text>}
-          <Text style={debug}>{diag.counters}</Text>
-          <Text style={debug}>{updateStatus}</Text>
-          {run !== null ? (
-            <View style={styles.runBar}>
-              <Text style={[styles.runText, { color: theme.text }]}>
-                {runCount} read · {formatElapsed(now - Date.parse(run.startedAt))}
-              </Text>
-              <Button title="Stop" onPress={stopRun} />
-            </View>
-          ) : (
-            <Button title="Run" onPress={() => setRunOpen(true)} />
+      <View style={styles.cameraArea} onLayout={onAreaLayout}>
+        <View style={[styles.cameraBox, { backgroundColor: theme.camera }, geometry ? { height: geometry.view.height } : styles.fill]}>
+          {hasPermission && device !== undefined && geometry !== null && (
+            <Camera
+              ref={cameraRef}
+              style={StyleSheet.absoluteFill}
+              device={device}
+              isActive={cameraOn}
+              outputs={[frameOutput]}
+              constraints={[{ resolutionBias: frameOutput }]}
+              // The app is portrait-only: follow the interface, not the accelerometer, so tilting the
+              // phone over a bin never rotates the frames (and the OCR crop) away from the title band.
+              orientationSource="interface"
+              zoom={zoom}
+              resizeMode="cover"
+              onError={onCameraError}
+              onStarted={onCameraStarted}
+            />
           )}
-        </View>
-      )}
+          {hasPermission && geometry !== null && (
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={() => setPaused((p) => !p)}
+              accessibilityRole="button"
+              accessibilityLabel={paused ? 'Resume scanning' : 'Pause scanning'}
+            >
+              <View style={[styles.outline, box(geometry.outline)]} />
+              <View style={[styles.band, box(geometry.band)]} />
+              {paused && (
+                <View style={styles.pausedCover}>
+                  <Text style={styles.pausedText}>Paused</Text>
+                </View>
+              )}
+              <View style={[styles.hintBox, { top: bottomOf(geometry.outline) + HINT_GAP }]}>
+                <Text style={styles.hint}>{paused ? 'Tap to resume' : 'Tap to pause'}</Text>
+              </View>
+            </Pressable>
+          )}
+          {!hasPermission && !canRequestPermission && (
+            <View style={styles.cameraMessage}>
+              <Text style={styles.messageText}>BinDiver needs the camera to read card titles.</Text>
+              <Button title="Open Settings" onPress={() => void Linking.openSettings()} />
+            </View>
+          )}
+          {hasPermission && device === undefined && (
+            <View style={styles.cameraMessage}>
+              <Text style={styles.messageText}>No camera found.</Text>
+            </View>
+          )}
+          {cameraError !== null && <Text style={styles.cameraError}>{cameraError}</Text>}
 
-      <BottomBar theme={theme} settings={settings} setSetting={setSetting}
-        onSearch={() => setSearchOpen(true)} searchDisabled={game === null} />
+          {/* Test mode: beside the outline, left of the title strip. */}
+          {testMode && geometry !== null && (
+            <View style={[styles.testBox, { top: geometry.band.y, width: geometry.band.x - 2 * TEST_BOX_MARGIN }]}>
+              {frameSize && <Text style={styles.debug}>{formatFrameSize(frameSize, FRAME_ASPECT)}</Text>}
+              {diag.lastRead !== null && <Text style={styles.debug} numberOfLines={3}>{diag.lastRead}</Text>}
+              <Text style={styles.debug}>{diag.counters}</Text>
+              <Text style={styles.debug}>{updateStatus}</Text>
+              {run !== null ? (
+                <View style={styles.runBar}>
+                  <Text style={styles.runText}>
+                    {runCount} read · {formatElapsed(now - Date.parse(run.startedAt))}
+                  </Text>
+                  <Button title="Stop" onPress={stopRun} />
+                </View>
+              ) : (
+                <Button title="Run" onPress={() => setRunOpen(true)} />
+              )}
+            </View>
+          )}
+
+          {/* Search and the result card, over the camera's lower part: never above the space below the outline. */}
+          <View style={[styles.cardArea, geometry !== null && { top: bottomOf(geometry.outline) + CARD_AREA_GAP }]}
+            pointerEvents="box-none">
+            <Pressable
+              style={[styles.search, { backgroundColor: theme.panel, borderColor: theme.border }, game === null && styles.disabled]}
+              onPress={() => setSearchOpen(true)}
+              disabled={game === null}
+              accessibilityRole="button"
+              accessibilityLabel="Search"
+              accessibilityState={{ disabled: game === null }}
+            >
+              <Icon name="search" size={16} color={theme.text} />
+              <Text style={[styles.searchText, { color: theme.text }]}>Search</Text>
+            </Pressable>
+            <ResultCard shown={shown} onOpen={openList} />
+          </View>
+        </View>
+      </View>
 
       <PriceSheet visible={priceOpen} onClose={() => setPriceOpen(false)} />
       <SettingsScreen visible={settingsOpen} codeStatus={updateStatus} onClose={() => setSettingsOpen(false)} />
       <SearchSheet visible={searchOpen} onPick={onPick} onCancel={() => setSearchOpen(false)} />
+      <ResultSheet visible={listOpen} shown={shown} shownId={shownId} onClose={() => setListOpen(false)} />
       <RunScreen
         visible={runOpen}
         unmatched={lastUnmatched}
@@ -419,6 +444,7 @@ export function ScanScreen({ onOpenPrice, onOpenSettings }: Props) {
 }
 
 const box = (r: Rect) => ({ left: r.x, top: r.y, width: r.width, height: r.height });
+const bottomOf = (r: Rect) => r.y + r.height;
 
 /** Whether the app is in the foreground. */
 function useAppActive(): boolean {
@@ -444,7 +470,9 @@ function useNow(enabled: boolean): number {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  cameraBox: { flex: 1, overflow: 'hidden' },
+  cameraArea: { flex: 1 },
+  cameraBox: { overflow: 'hidden' },
+  fill: { flex: 1 },
   outline: { position: 'absolute', borderWidth: 2, borderColor: 'rgba(255,255,255,0.8)', borderRadius: 6 },
   band: { position: 'absolute', borderWidth: 2, borderColor: BAND, backgroundColor: 'rgba(255,159,67,0.18)' },
   pausedCover: {
@@ -454,7 +482,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   pausedText: { color: '#fff', fontSize: 22, fontWeight: '600' },
-  hintBox: { position: 'absolute', bottom: 6, left: 0, right: 0, alignItems: 'center' },
+  hintBox: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
   hint: {
     color: '#fff', fontSize: 12, backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 999,
     paddingHorizontal: 8, paddingVertical: 2, overflow: 'hidden',
@@ -462,8 +490,19 @@ const styles = StyleSheet.create({
   cameraMessage: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 },
   messageText: { color: '#fff', fontSize: 17, textAlign: 'center' },
   cameraError: { position: 'absolute', top: 6, left: 8, right: 8, color: '#f88', fontSize: 12 },
-  testBlock: { paddingHorizontal: 16, paddingTop: 6, gap: 2 },
-  debug: { fontSize: 11, textAlign: 'center' },
-  runBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 },
-  runText: { fontSize: 17, fontVariant: ['tabular-nums'] },
+  testBox: {
+    position: 'absolute', left: TEST_BOX_MARGIN, padding: 6, gap: 2, borderRadius: 8,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+  },
+  debug: { fontSize: 11, color: 'rgba(255,255,255,0.85)' },
+  runBar: { alignItems: 'flex-start' },
+  runText: { fontSize: 15, color: '#fff', fontVariant: ['tabular-nums'] },
+  // flex-end: Search sits on the card, both at the bottom; the card shrinks rather than rise past the top.
+  cardArea: { position: 'absolute', left: 10, right: 10, bottom: 10, justifyContent: 'flex-end', gap: 8 },
+  search: {
+    alignSelf: 'flex-end', height: 46, paddingHorizontal: 16, borderRadius: 999, borderWidth: 1,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+  },
+  searchText: { fontSize: 14, fontWeight: '500' },
+  disabled: { opacity: 0.5 },
 });

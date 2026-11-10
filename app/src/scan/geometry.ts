@@ -4,7 +4,12 @@ export type Percent = `${number}%`;
 export interface PercentRegion { left: Percent; top: Percent; width: Percent; height: Percent }
 
 export const CARD_ASPECT = 63 / 88; // width / height
-export const OUTLINE_SHARE = 0.88; // outline fits within 88% of the view in both directions
+/**
+ * The outline's width as a share of the camera's, and its top margin as a share of its own height: the size and
+ * place it had when the camera took the top half of Matt's iPhone 13 (Nov 10), so the holding distance stays.
+ */
+export const OUTLINE_WIDTH_SHARE = 0.41;
+export const OUTLINE_TOP = 0.068;
 // The title strip, as shares of the outline: from 2% above its top edge to 20% down, and 4% of its
 // width past each side. A title sits about 5-8% down a card; only the topmost line in the strip is read.
 export const BAND_TOP = -0.02;
@@ -73,11 +78,20 @@ export function isEarlyZoomError(message: string): boolean {
   return message.includes('OperationCanceledException') && message.includes('Camera is not active');
 }
 
-/** The card-shaped outline, centred in the view. */
+/**
+ * The camera view's height: all the space available, but never taller than the frame at that width
+ * (`frameAspect` is the frame's width / height), so the preview never crops its sides and the cover
+ * scale stays viewWidth / frameWidth. On a taller screen the rest is page background.
+ */
+export function cameraHeight(available: Size, frameAspect: number): number {
+  return Math.min(available.height, available.width / frameAspect);
+}
+
+/** The card-shaped outline: a fixed share of the camera's width, centred across it, near its top. */
 export function cardOutline(view: Size): Rect {
-  const height = Math.min(OUTLINE_SHARE * view.height, (OUTLINE_SHARE * view.width) / CARD_ASPECT);
-  const width = height * CARD_ASPECT;
-  return { x: (view.width - width) / 2, y: (view.height - height) / 2, width, height };
+  const width = OUTLINE_WIDTH_SHARE * view.width;
+  const height = width / CARD_ASPECT;
+  return { x: (view.width - width) / 2, y: OUTLINE_TOP * height, width, height };
 }
 
 /** The title strip across the top of the outline. */
