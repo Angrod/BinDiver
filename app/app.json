@@ -1,0 +1,76 @@
+{
+  "expo": {
+    "name": "BinDiver",
+    "slug": "bindiver",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.angrod.bindiver",
+      "infoPlist": {
+        "NSCameraUsageDescription": "BinDiver reads card titles with the camera.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "com.angrod.bindiver",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-sqlite",
+      "expo-sharing",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": false,
+          "recordAudioAndroid": false,
+          "enableBackgroundPlayback": false
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 26,
+            "enableMinifyInReleaseBuilds": false
+          }
+        }
+      ],
+      [
+        "react-native-vision-camera-ocr-plus",
+        {
+          "disableTranslate": true,
+          "disableNonLatinTextRecognition": true
+        }
+      ],
+      "expo-asset"
+    ],
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "4e0fa4bd-3538-4405-8de8-641d28a7e039"
+      }
+    },
+    "owner": "apogeeappdev",
+    "updates": {
+      "url": "https://u.expo.dev/4e0fa4bd-3538-4405-8de8-641d28a7e039"
+    }
+  }
+}

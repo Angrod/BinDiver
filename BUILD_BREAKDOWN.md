@@ -59,6 +59,36 @@ Phase 2's success criteria pass, so Phase 3 is next. The spot text builds and co
 - **Same-year arts:** when one artist drew several arts for a card in the same year, the printed "art by" words are identical, so those versions now fall to collector number or to "check a reference image" (this is why coverage fell from 94% to 93% against the first build).
 - **Counterspell at $25+:** "Counterspell: 20 of 106 versions worth finding at $25.00+. Value sits in old-border 1993-frame nonfoils (7 of 14) and old-border 1997-frame foils (3 of 3). Skip old-border 1997-frame nonfoils and retro-frame foils (0 of 20)." This matches the spec's example.
 
+## Phase 3 camera test results (Nov 9, 2026)
+
+The camera test passes on both phones, so Plan 2 (the rest of the app) is next. On Matt's iPhone 13, a 50-card stack read 50 of 50 cards right, averaging 2.54 seconds a card (targets: at least 95% and under 3 seconds). After the fixes below, the same 28 cards read 28 of 28 right on both the iPhone (2.39 s a card) and a Pixel 8 (2.66 s a card).
+
+- **Phone and build:** iPhone 13, EAS preview build `f08732da` (Nov 9), then update `01a1be9f` for run 3. Runs 2 and 3 had the phone in a holder above the cards. All three stacks were English cards.
+- **Run 1 (Nov 8, 54 cards, phone in hand):** 54 of 54 right, 5.23 s a card, so speed failed. Old-frame titles such as Cooperation, Drought and Circle of Protection took 9–18 s because ML Kit garbles their font, and the pace between cards was relaxed.
+- **Run 2 (Nov 9, 51 cards, same code):** 51 of 51 right, 4.15 s a card (3.61 s without three long pauses). The update hadn't loaded yet: iOS only checks for one when the app starts fresh, not when it comes back from the background.
+- **Run 3 (Nov 9, 50 cards, with the update):** 50 of 50 right, none wrong or missed, 2.54 s a card (median 2.41 s), with no pause over 4.2 s.
+- **Where the time goes (run 3):** once a card was in the outline, the app read it in a median 0.7 s (average 0.9 s). The fastest read was 0.4 s, which is the floor set by needing three matching reads at least 200 ms apart. The other 1.6 s or so per card was handling. Six cards took 1.8–2.8 s to read while they were being lined up.
+- **What the update changed:**
+  - Camera reads that miss the normal match get a looser one: 70% alike, same first letter, at least 6 letters, and a clear lead over the next-closest name. In run 3 it committed once, correctly ("Ballisca guad" as Ballista Squad).
+  - Short digit-led mana-cost junk is trimmed from the end of a line.
+  - The export gained a seconds-to-read column.
+  - The camera, the 2× zoom and the outline were unchanged.
+- **Misreads:** none of the 155 cards across the three runs was read as the wrong card. 40 reads matched despite misread letters: capital E read as G (Gviscerator, Gxotic Curse, Ghitu Fire-Gater), S as B or Y, i as í, and garbled endings (Radiant's Dragoo15). They are now regression tests: 87 misreads and 9 loose-match garbles.
+- **Watch for:** a half-read title can loosely match a different card. Run 2's "radiau" matches Radiate, for example. It needs three matching reads in a row to commit, and none has. An update can remove the loose step if one ever does.
+- **Matt's feedback:** reads feel instant once the title is in the orange strip, but the strip is tight to line a card up in.
+- **After the gate (Nov 9, iPhone):**
+  - The strip was widened after Matt's feedback: it now runs from just above the outline to a fifth of the way down, a little wider than the outline.
+  - Run 4 (28 cards, including split, double-faced, foil and sleeved): 27 of 28 right, none wrong. The miss was "_____ _____ Rocketship", whose blanks the camera doesn't read. Blank-name cards now also match the words around their blanks: 10 of the 15 such cards. Of the other 5, three share their words with other names and two are only blanks.
+  - Run 5 (side by side with the Pixel): 3 wrong cards came from the copyright line while the strip sat over the bottom of a card ("Wizards of the Coast" as Wizards of the _____, "Coast" as Roast, a type line as Ninja). A read that holds any piece of the copyright line now counts as no card. Of all card names, only the joke card "Of the Coast" is blocked, and typing still finds it.
+  - Run 6 (28 cards, one phone): 28 of 28 right, 2.39 s a card, median read 0.5 s, slowest 1.3 s.
+- **Android (Pixel 8, Nov 9):**
+  - Installed free: the EAS preview APK goes on over USB, so no Google Play account is needed.
+  - The first build crashed at launch: Android's code shrinker (R8) removed constructors that ML Kit creates by reflection. Shrinking is off for now; it needs ML Kit keep rules before any store release.
+  - Run 1: 24 of 24 right but slow (4.3 s average read, up to 19 s), and 8 titles lost their first or last letters. Android's camera shows a 4:3 picture, but the reader's frames were 16:9, so it read an area below and inside the orange strip. Android frames are now 4:3 too, and the grey frame line flags a frame of another shape.
+  - Run 2 (the same 28 cards as iPhone run 6): 28 of 28 right, 2.66 s a card, median read 0.55 s, slowest 2.1 s. It matched 27 titles exactly against the iPhone's 21, since its frames have about 880 pixels across a card against the iPhone's 660.
+- **iOS updates until the next iOS build:** the Android-only shrinking setting changed the iOS runtime version, so the iOS update is published from app.json as the iPhone build saw it (that setting left out). The next iOS build ends this step.
+- **Not tested yet:** the iPhone 15 Pro (it needs registering and a new build), and foreign-language cards (Japanese titles need ML Kit's Japanese reader, which means a new native build).
+
 ## What gets built
 
 ### Phase 1: Prove the lookup (Mac only)

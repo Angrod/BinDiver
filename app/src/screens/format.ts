@@ -1,0 +1,70 @@
+import type { CardMatch } from '../game/types';
+import type { Size } from '../scan/geometry';
+
+const DASH = '—';
+
+/** Run time as m:ss, or h:mm:ss from an hour. Negative times show as 0:00. */
+export function formatElapsed(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  const ss = String(s).padStart(2, '0');
+  return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`;
+}
+
+/** "Read right": a percentage with one decimal, plus the counts it comes from. */
+export function formatReadRight(rate: number | null, right: number, stack: number): string {
+  if (rate === null) return DASH;
+  return `${(rate * 100).toFixed(1)}% (${right} of ${stack})`;
+}
+
+/** "Seconds per card" with one decimal place. */
+export function formatSecondsPerCard(seconds: number | null): string {
+  return seconds === null ? DASH : seconds.toFixed(1);
+}
+
+/** The frame size, flagged when its shape isn't the expected one (the preview's), so the strip isn't what is read. */
+export function formatFrameSize(size: Size, aspect: number): string {
+  const shapeOk = Math.abs(size.width / size.height - aspect) < 0.01;
+  return `Frame ${size.width}×${size.height}${shapeOk ? '' : ' · not the preview’s shape'}`;
+}
+
+/** The live debug line: the last candidate text read and the card it matched, or none. */
+export function formatLastRead(text: string, matched: string | null): string {
+  return `“${text}” → ${matched ?? 'none'}`;
+}
+
+/** The counters line: OCR errors, dropped frames, then the live zoom and match time when known. */
+export function formatCounters(
+  ocrErrors: number, dropped: number, zoom: { actual: number; target: number } | null, matchMs: number | null,
+): string {
+  let line = `OCR errors ${ocrErrors} · dropped ${dropped}`;
+  if (zoom !== null) line += ` · zoom ${zoom.actual.toFixed(1)} (want ${zoom.target.toFixed(1)})`;
+  if (matchMs !== null) line += ` · match ${Math.round(matchMs)} ms`;
+  return line;
+}
+
+/** Whether a match shows the line it was read from: one read with misread letters. */
+export function showsReadAs(match: CardMatch['match']): boolean {
+  return match === 'tolerant' || match === 'loose';
+}
+
+export function versionsLine(n: number): string {
+  return `${n} ${n === 1 ? 'version' : 'versions'} at $10+`;
+}
+
+/** A scan's local time of day, HH:MM:SS. */
+export function timeOfDay(iso: string): string {
+  const d = new Date(iso);
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+
+/** A positive whole number typed into a box, or null. */
+export function parseStackCount(text: string): number | null {
+  const t = text.trim();
+  if (!/^\d+$/.test(t)) return null;
+  const n = Number(t);
+  return n >= 1 && n <= 10000 ? n : null;
+}

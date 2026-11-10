@@ -5,6 +5,8 @@
     python -m bindiver report scan.csv --min 5 --min 10 --min 20
     python -m bindiver coverage scan.csv --min 10
     python -m bindiver selftest scan.csv --min 10 --out data/selftest.html
+    python -m bindiver phone-db                # write the phone database, zip and manifest to data/
+    python -m bindiver golden --out DIR        # write the golden fixtures the phone port is tested against
 """
 
 import argparse
@@ -15,9 +17,11 @@ from pathlib import Path
 
 from bindiver.mtg.build_db import build_db, iter_bulk
 from bindiver.mtg.bulk_data import BULK_FILE, fetch_set_icons, read_local_meta, update, update_sets
+from bindiver.mtg.golden import write_golden
 from bindiver.mtg.hand_notes import HAND_NOTES_FILE
 from bindiver.mtg.lookup import SORT_ORDERS, Catalog
 from bindiver.mtg.manabox import read_manabox_names
+from bindiver.mtg.phone_db import build_phone_db, icon_uris_needed
 from bindiver.mtg.report import bulk_report, coverage_report, format_result
 from bindiver.mtg.selftest import pick_names, render_html
 
@@ -134,6 +138,22 @@ def cmd_selftest(args):
     print(f"Wrote {out} ({out.stat().st_size / 1e3:.0f} KB): {len(picked)} cards, {len(icons)} set icons")
 
 
+def cmd_phone_db(args):
+    if not DB_FILE.exists():
+        sys.exit("No card database yet. Run: python -m bindiver update")
+    manifest = build_phone_db(DB_FILE, DATA_DIR, fetch_set_icons(icon_uris_needed(DB_FILE), DATA_DIR))
+    print(f"Phone database: {manifest['db_bytes'] / 1e6:.1f} MB, zip {manifest['zip_bytes'] / 1e6:.1f} MB, "
+          f"prices as of {manifest['price_date']}")
+
+
+def cmd_golden(args):
+    if not DB_FILE.exists():
+        sys.exit("No card database yet. Run: python -m bindiver update")
+    out = Path(args.out)
+    write_golden(DB_FILE, out, fetch_set_icons(icon_uris_needed(DB_FILE), DATA_DIR))
+    print(f"Wrote golden fixtures to {out}")
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(prog="bindiver", description="Which versions of this card are worth finding?")
     sub = parser.add_subparsers(required=True)
@@ -166,6 +186,13 @@ def main(argv=None):
     p.add_argument("--min", type=float, default=10.0, help="price threshold in USD (default 10)")
     p.add_argument("--out", default=str(DATA_DIR / "selftest.html"))
     p.set_defaults(func=cmd_selftest)
+
+    p = sub.add_parser("phone-db", help="write the slimmed phone database, its zip and manifest")
+    p.set_defaults(func=cmd_phone_db)
+
+    p = sub.add_parser("golden", help="write the golden fixtures the phone port is tested against")
+    p.add_argument("--out", required=True, help="directory to write golden.sqlite and the JSON files into")
+    p.set_defaults(func=cmd_golden)
 
     args = parser.parse_args(argv)
     args.func(args)

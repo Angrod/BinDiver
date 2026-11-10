@@ -137,6 +137,7 @@ The first thing built.
 - **Title line:**
   - Only text lines whose box sits inside the highlighted strip count.
   - The topmost of those is the title.
+  - A read whose strip holds any piece of the card's copyright line ("© 2026 Wizards of the Coast", "Viacom") counts as no title, since the strip is then over the bottom of a card. This blocks only the joke card "Of the Coast", which typing still finds. (Added after the Nov 9 runs.)
 - **Mana symbols:**
   - The reader turns mana symbols at the end of the line into junk text.
   - So the matcher tries the whole line first, then drops up to 3 trailing words one at a time, and keeps the best match.
@@ -145,10 +146,13 @@ The first thing built.
   - Edit distance then picks the closest one.
   - A match needs similarity of at least 0.8, the Python cutoff.
   - Target: under 20 ms per line.
+- **Loose matches (camera only, added Nov 9):** a camera line that misses both of those gets one more try, for badly garbled old-frame titles: the closest name at similarity 0.7 or more that starts with the line's first character, for lines of at least 6 letters, and only when it beats the next-closest name by 0.02. Typed search stays at 0.8. These count as match kind `loose`.
+- **Blank-name cards (added Nov 9):** cards named with blanks, such as "_____ _____ Rocketship", also match the words printed around the blanks ("Rocketship"), unless those words are part of another card's name or two blank cards share them.
 - **Tokens:** a token name shows "Token, not tracked", with no alert.
 - **Commit rule:**
   - A card counts as read once the same card has matched 3 reads in a row.
   - A line that matches nothing is ignored, and the last result stays on screen.
+  - A read that holds the copyright line starts the count of 3 again.
   - Reading the same card again does nothing.
 
 ### 2.3 What it records
@@ -161,9 +165,9 @@ Every committed read is written to `user.sqlite` (section 4.3). In test mode a r
   - average seconds per card: time from the first read to the last, divided by the number of reads after the first
 - **Mark wrong:** tap any read to mark it wrong.
 - **Export:** a share button sends the run as a CSV file. Each row has:
-  - time and seconds since the previous read
+  - time, seconds since the previous read, and seconds the card took to read
   - raw text, and the line used
-  - matched name and match kind (exact, tolerant, typed)
+  - matched name and match kind (exact, tolerant, loose, typed)
   - price date, price setting, and whether it alerted
   - whether it was marked wrong
 
@@ -258,7 +262,7 @@ The gear button opens Settings:
 | --- | --- |
 | `known_cards` | `oracle_id` (key), `name`, `marked_at` |
 | `known_kept_versions` | `oracle_id`, `version_key` (`scryfall_id:finish`), together the key |
-| `scans` | `id`, `at`, `run_id` (test runs only, else empty), `oracle_id`, `name`, `source` (`camera` or `search`), `raw_text`, `line_used`, `match` (`exact`, `tolerant`, `typed`), `price_date`, `min_cents`, `alerted`, `marked_wrong` |
+| `scans` | `id`, `at`, `run_id` (test runs only, else empty), `oracle_id`, `name`, `source` (`camera` or `search`), `raw_text`, `line_used`, `match` (`exact`, `tolerant`, `loose`, `typed`), `price_date`, `min_cents`, `alerted`, `marked_wrong`, `read_ms` (camera reads: how long the card took to read) |
 | `test_runs` | `id`, `started_at`, `stopped_at`, `stack_count` |
 | `settings` | `key`, `value` |
 
@@ -266,9 +270,10 @@ A kept version that later disappears from the data is ignored. `marked_at` and `
 
 **Nothing leaves the phone.** There are no accounts and no analytics. The only network traffic is:
 - the manifest and database download from GitHub
-- the app's check with Expo's update server for a newer version of its own code (EAS Update)
+- the app's check with Expo's update server for a newer version of its own code (EAS Update), when the app starts and when it comes back to the front (at most once a minute). Each check carries a random ID that expo-updates makes for each install (the `EAS-Client-ID` header), which is how Expo counts installs. Not yet decided for a public release: accept it, or host updates without it.
+- Google ML Kit's own traffic: it sends Google metrics about how its text reader performs and is used, and it fetches model updates. Matt accepted this on 2026-11-08 rather than switch to Apple's text reader.
 
-Neither carries Matt's data.
+None of these carries Matt's data: the update check's install ID is random, not tied to an account. ML Kit reads the camera frames on the phone and doesn't send them or the text it reads.
 
 ## 5. When things go wrong
 
