@@ -13,7 +13,7 @@ const cases = golden.cases as Case[];
 const db = openNodeDb(path.join(__dirname, '../__fixtures__/golden.sqlite'));
 afterAll(() => db.close());
 
-test('golden has 450 cases', () => expect(cases.length).toBe(450));
+test('golden has 486 cases', () => expect(cases.length).toBe(486));
 
 test.each(cases)('$query at $min_cents ($order)', (c) => {
   const resolved = resolveExact(db, normalizeName(c.query));

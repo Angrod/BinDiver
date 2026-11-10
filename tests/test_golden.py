@@ -1,5 +1,6 @@
 import json
 import sqlite3
+from pathlib import Path
 
 import pytest
 
@@ -8,7 +9,10 @@ from bindiver.mtg.golden import NORMALIZE_EXTRAS, golden_cases, write_golden
 from bindiver.mtg.hand_notes import load_hand_notes
 from bindiver.mtg.lookup import Catalog
 from bindiver.mtg.normalize import normalize_name
+from bindiver.mtg.quiet import QUIET_KINDS
 from conftest import CS_SETS, FIXTURES
+
+REAL_DB = Path(__file__).resolve().parent.parent / "data" / "cards.sqlite"
 
 
 @pytest.fixture
@@ -77,3 +81,20 @@ def test_golden_json_shape(db, tmp_path):
     data = json.loads((out / "golden.json").read_text(encoding="utf-8"))
     assert data["price_date"] == "2026-11-03" and data["phone_format"] == 1
     assert len(data["cases"]) == 9
+
+
+def test_every_case_has_alert_strength_and_quiet_kinds(db):
+    for case in golden_cases(Catalog(db), names=("Counterspell", "Shu Jing Meteorite")):
+        assert case["alert"] in ("full", "quiet", "none")
+        if case["alert"] == "quiet":
+            assert case["quiet_kinds"] and all(k in QUIET_KINDS for k in case["quiet_kinds"])
+        else:
+            assert case["quiet_kinds"] == []
+        assert (case["alert"] == "none") == (not any(g["qualifying"] for g in case["groups"]))
+
+
+@pytest.mark.skipif(not REAL_DB.exists(), reason="data/cards.sqlite not built")
+def test_explore_at_ten_dollars_is_a_quiet_secret_lair_alert():
+    cases = golden_cases(Catalog(REAL_DB), names=("Explore",))
+    case = case_for(cases, "Explore", 1000, "price")
+    assert (case["alert"], case["quiet_kinds"]) == ("quiet", ["Secret Lair"])

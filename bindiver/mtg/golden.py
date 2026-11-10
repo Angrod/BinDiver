@@ -7,6 +7,7 @@ from pathlib import Path
 from bindiver.mtg.lookup import SORT_ORDERS, Catalog
 from bindiver.mtg.normalize import normalize_name
 from bindiver.mtg.phone_db import PHONE_FORMAT, write_phone_tables
+from bindiver.mtg.quiet import alert_strength, quiet_kinds_of
 
 GOLDEN_NAMES = (
     "Fireball", "Counterspell", "Birds of Paradise", "Lightning Bolt", "Sol Ring", "Llanowar Elves",
@@ -20,6 +21,7 @@ GOLDEN_NAMES = (
     "Thermo-Alchemist", "Quicksilver Dagger", "Echoing Truth", "Cathar Commando", "Chaos Wand",
     "Brotherhood's End", "Ihsan's Shade", "Stable Wormhole", "Temporal Extortion", "Blue Dragon",
     "Serra Angel", "Shivan Dragon", "Juzám Djinn", "Urza's Tower", "Sensei's Divining Top",
+    "Explore", "Bone Saw", "Opt", "Burnished Hart",
 )
 GOLDEN_PRICES = (2, 10, 50)
 NORMALIZE_EXTRAS = ("", "  Lightning   Bolt  ", "FIREBALL", "Fire//Ice", "fire  //  ice", "Urza’s Tower",
@@ -41,6 +43,8 @@ def golden_cases(catalog, names=GOLDEN_NAMES):
                     "min_cents": price * 100,
                     "order": order,
                     "match": result.match,
+                    "alert": alert_strength(result.groups),
+                    "quiet_kinds": quiet_kinds_of(result.groups),
                     "groups": [{
                         "oracle_id": g.oracle_id,
                         "name": g.name,
