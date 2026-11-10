@@ -2,15 +2,13 @@ import { setAudioModeAsync, useAudioPlayer } from 'expo-audio';
 import { useKeepAwake } from 'expo-keep-awake';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  AppState, Button, LayoutChangeEvent, Linking, Modal, Platform, Pressable, StyleSheet, Text, View,
+  AppState, Button, LayoutChangeEvent, Linking, Platform, Pressable, StyleSheet, Text, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Camera, useCameraDevice, useCameraPermission, type CameraRef } from 'react-native-vision-camera';
-import { priceLabel } from '../alert/alert';
 import { signalPlan } from '../alert/signal';
 import { useAlertSignal } from '../alert/useAlertSignal';
-import { isStale } from '../data/policy';
-import type { CardMatch, SortOrder } from '../game/types';
+import type { CardMatch } from '../game/types';
 import { CommitTracker } from '../scan/commit';
 import {
   cameraZoom, cardOutline, frameShape, isEarlyZoomError, titleBand, viewRectToFrameRegion, zoomToApply,
@@ -27,19 +25,15 @@ import { useUpdateStatus } from '../updates/useUpdateStatus';
 import type { TestRun } from '../user/store';
 import { formatCounters, formatElapsed, formatFrameSize, formatLastRead } from './format';
 import { ResultPanel } from './ResultPanel';
-import { formatPriceDate } from './resultView';
 import { RunScreen } from './RunScreen';
+import { BottomBar, TopStrip } from './ScanBars';
 import { SearchSheet } from './SearchSheet';
 import { useTheme } from './theme';
-import { Icon } from './VersionRow';
 
 const DIAGNOSTICS_MS = 500; // the debug line and counters re-render at most this often
 const BAND = '#ff9f43';
 /** The camera frames' shape on this platform: the preview's, so the title strip is the area read. */
 const FRAME_ASPECT = frameShape(Platform.OS).aspect;
-const SORTS: ReadonlyArray<[SortOrder, string]> = [
-  ['oldest', 'Oldest first'], ['newest', 'Newest first'], ['price', 'Highest price'],
-];
 
 interface Props {
   /** The price chip: opens the price sheet. */
@@ -78,7 +72,6 @@ export function ScanScreen({ onOpenPrice, onOpenSettings }: Props) {
   const [shownId, setShownId] = useState(0);
   const [paused, setPaused] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
-  const [sortOpen, setSortOpen] = useState(false);
   const [runOpen, setRunOpen] = useState(false);
   const [frameSize, setFrameSize] = useState<Size | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
@@ -180,8 +173,9 @@ export function ScanScreen({ onOpenPrice, onOpenSettings }: Props) {
   const commitResult = useCallback(
     (m: CardMatch, model: ResultModel, source: 'camera' | 'search', rawText: string, readMs: number | null,
       thisVersion: string | null) => {
-      const r = runRef.current;
       const s = settingsRef.current;
+      // A run left open stays open, but only test mode adds scans to it.
+      const r = s.testMode ? runRef.current : null;
       user.recordScan({
         at: new Date().toISOString(),
         runId: r?.id ?? null,
@@ -244,7 +238,7 @@ export function ScanScreen({ onOpenPrice, onOpenSettings }: Props) {
       // Keep the lines only when the whole read found nothing: a joined row that missed while one of
       // its lines matched is a good read, not a line to tune for.
       const r = runRef.current;
-      if (r !== null && match === null && noMatch.length > 0) {
+      if (r !== null && settingsRef.current.testMode && match === null && noMatch.length > 0) {
         if (unmatched.current?.runId !== r.id) unmatched.current = { runId: r.id, lines: new UnmatchedLines() };
         for (const t of noMatch) unmatched.current.lines.add(t);
       }
@@ -301,7 +295,7 @@ export function ScanScreen({ onOpenPrice, onOpenSettings }: Props) {
   };
 
   // Test runs
-  const now = useNow(run !== null);
+  const now = useNow(run !== null && testMode);
   const startRun = (stackCount: number) => {
     const at = new Date().toISOString();
     const id = user.startRun(stackCount, at);
@@ -324,35 +318,12 @@ export function ScanScreen({ onOpenPrice, onOpenSettings }: Props) {
     setRunOpen(true);
   };
 
-  const today = new Date();
-  const stale = priceDate !== null && isStale(priceDate, today);
-  const price = priceLabel(settings.minCents);
-  const sortLabel = SORTS.find(([o]) => o === settings.sort)?.[1] ?? SORTS[0][1];
-  const barButton = [styles.barButton, { backgroundColor: theme.panel, borderColor: theme.border }];
-  const barText = [styles.barText, { color: theme.text }];
   const debug = [styles.debug, { color: theme.muted }];
 
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: theme.bg }]}>
-      <View style={styles.top}>
-        <Text style={[styles.prices, { color: stale ? theme.quiet : theme.muted }, stale && styles.stale]}>
-          Prices as of {priceDate !== null ? formatPriceDate(priceDate, today) : 'unknown'}
-        </Text>
-        <View style={styles.topButtons}>
-          <Pressable
-            style={[styles.priceChip, { backgroundColor: theme.panel, borderColor: theme.border }]}
-            onPress={onOpenPrice}
-            accessibilityRole="button"
-            accessibilityLabel={`Alert price: ${price.slice(0, -1)} and up. Change`}
-          >
-            <Text style={[styles.priceText, { color: theme.text }]}>{price}</Text>
-            <Icon name="down" size={14} color={theme.text} />
-          </Pressable>
-          <Pressable style={styles.gear} onPress={onOpenSettings} accessibilityRole="button" accessibilityLabel="Settings">
-            <Icon name="gear" size={22} color={theme.text} />
-          </Pressable>
-        </View>
-      </View>
+      <TopStrip theme={theme} priceDate={priceDate} minCents={settings.minCents}
+        onOpenPrice={onOpenPrice} onOpenSettings={onOpenSettings} />
 
       <View style={[styles.cameraBox, { backgroundColor: theme.camera }]} onLayout={onCameraLayout}>
         {hasPermission && device !== undefined && geometry !== null && (
@@ -426,65 +397,9 @@ export function ScanScreen({ onOpenPrice, onOpenSettings }: Props) {
         </View>
       )}
 
-      <View style={styles.bar}>
-        <Pressable
-          style={barButton}
-          onPress={() => setSetting('shorthand', !settings.shorthand)}
-          accessibilityRole="switch"
-          accessibilityState={{ checked: settings.shorthand }}
-        >
-          <View style={[styles.dot, settings.shorthand
-            ? { backgroundColor: theme.accent, borderColor: theme.accent }
-            : { borderColor: theme.muted }]} />
-          <Text style={barText}>Shorthand</Text>
-        </Pressable>
-        <Pressable
-          style={barButton}
-          onPress={() => setSortOpen(true)}
-          accessibilityRole="button"
-          accessibilityLabel={`Sort versions: ${sortLabel.toLowerCase()}`}
-        >
-          <Text style={barText}>{sortLabel}</Text>
-          <Icon name="down" size={14} color={theme.text} />
-        </Pressable>
-        <Pressable
-          style={[barButton, game === null && styles.disabled]}
-          onPress={() => setSearchOpen(true)}
-          disabled={game === null}
-          accessibilityRole="button"
-          accessibilityState={{ disabled: game === null }}
-        >
-          <Icon name="search" size={16} color={theme.text} />
-          <Text style={barText}>Search</Text>
-        </Pressable>
-      </View>
+      <BottomBar theme={theme} settings={settings} setSetting={setSetting}
+        onSearch={() => setSearchOpen(true)} searchDisabled={game === null} />
 
-      <Modal visible={sortOpen} transparent animationType="fade" onRequestClose={() => setSortOpen(false)}>
-        <View style={styles.menuWrap}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => setSortOpen(false)} accessibilityRole="button"
-            accessibilityLabel="Close the sort menu" />
-          <View style={[styles.menu, { backgroundColor: theme.panel, borderColor: theme.border }]} accessibilityRole="menu">
-            {SORTS.map(([order, label]) => {
-              const on = order === settings.sort;
-              return (
-                <Pressable
-                  key={order}
-                  style={[styles.menuRow, { borderColor: theme.divider }]}
-                  onPress={() => {
-                    setSetting('sort', order);
-                    setSortOpen(false);
-                  }}
-                  accessibilityRole="menuitem"
-                  accessibilityState={{ selected: on }}
-                >
-                  <Text style={[styles.menuText, { color: theme.text }, on && styles.menuOn]}>{label}</Text>
-                  {on && <Icon name="check" size={16} color={theme.text} />}
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
-      </Modal>
       <SearchSheet visible={searchOpen} onPick={onPick} onCancel={() => setSearchOpen(false)} />
       <RunScreen
         visible={runOpen}
@@ -522,19 +437,6 @@ function useNow(enabled: boolean): number {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  top: {
-    minHeight: 60, paddingHorizontal: 16, paddingVertical: 8,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8,
-  },
-  prices: { fontSize: 13, flexShrink: 1 },
-  stale: { fontWeight: '600' },
-  topButtons: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  priceChip: {
-    height: 44, paddingHorizontal: 16, borderRadius: 999, borderWidth: 1,
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-  },
-  priceText: { fontSize: 15, fontWeight: '600' },
-  gear: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   cameraBox: { flex: 1, overflow: 'hidden' },
   outline: { position: 'absolute', borderWidth: 2, borderColor: 'rgba(255,255,255,0.8)', borderRadius: 6 },
   band: { position: 'absolute', borderWidth: 2, borderColor: BAND, backgroundColor: 'rgba(255,159,67,0.18)' },
@@ -557,20 +459,4 @@ const styles = StyleSheet.create({
   debug: { fontSize: 11, textAlign: 'center' },
   runBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 },
   runText: { fontSize: 17, fontVariant: ['tabular-nums'] },
-  bar: { paddingHorizontal: 10, paddingTop: 12, paddingBottom: 18, flexDirection: 'row', gap: 8 },
-  barButton: {
-    flex: 1, height: 46, borderRadius: 12, borderWidth: 1,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-  },
-  barText: { fontSize: 14, fontWeight: '500' },
-  disabled: { opacity: 0.5 },
-  dot: { width: 10, height: 10, borderRadius: 5, borderWidth: 1.5 },
-  menuWrap: { flex: 1, justifyContent: 'flex-end', padding: 10, paddingBottom: 96, backgroundColor: 'rgba(0,0,0,0.35)' },
-  menu: { borderRadius: 12, borderWidth: 1, overflow: 'hidden' },
-  menuRow: {
-    minHeight: 50, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-  },
-  menuText: { fontSize: 16 },
-  menuOn: { fontWeight: '700' },
 });
