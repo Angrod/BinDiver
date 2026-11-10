@@ -292,7 +292,7 @@ The gear button opens Settings:
 | --- | --- |
 | `known_cards` | `oracle_id` (key), `name`, `marked_at` |
 | `known_kept_versions` | `oracle_id`, `version_key` (`scryfall_id:finish`), together the key |
-| `scans` | `id`, `at`, `run_id` (test runs only, else empty), `oracle_id`, `name`, `source` (`camera` or `search`), `raw_text`, `line_used`, `match` (`exact`, `tolerant`, `loose`, `typed`), `price_date`, `min_cents`, `alerted`, `marked_wrong`, `read_ms` (camera reads: how long the card took to read) |
+| `scans` | `id`, `at`, `run_id` (test runs only, else empty), `oracle_id`, `name`, `source` (`camera` or `search`), `raw_text`, `line_used`, `match` (`exact`, `tolerant`, `loose`, `typed`), `price_date`, `min_cents`, `alerted` (a full alert), `marked_wrong`, `read_ms` (camera reads: how long the card took to read), `alert` (from Plan 2: `full`, `quiet`, `known` or `none`) |
 | `test_runs` | `id`, `started_at`, `stopped_at`, `stack_count` |
 | `settings` | `key`, `value` |
 
