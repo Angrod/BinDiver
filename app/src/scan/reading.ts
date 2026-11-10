@@ -85,10 +85,14 @@ export function matchCandidates(
   return { match: null, matchedText: '', noMatch: candidates.filter((c) => !failed.has(c)) };
 }
 
+/** A frame's title candidates, and whether the frame held the card's footer. */
+export interface FrameCandidates { candidates: string[]; footer: boolean }
+
 /**
  * A frame's title candidates (see titleCandidates), or none when any of its lines is the card's footer:
  * the strip is then over the bottom of a card, so its top line is a type line or rules text, not a title.
  */
-export function frameCandidates(game: Pick<Game, 'isFooterText'>, lines: OcrLine[]): string[] {
-  return lines.some((l) => game.isFooterText(l.text)) ? [] : titleCandidates(lines);
+export function frameCandidates(game: Pick<Game, 'isFooterText'>, lines: OcrLine[]): FrameCandidates {
+  const footer = lines.some((l) => game.isFooterText(l.text));
+  return { candidates: footer ? [] : titleCandidates(lines), footer };
 }

@@ -203,8 +203,12 @@ export function ScanScreen() {
       const g = gameRef.current;
       if (!g) return; // cards are loading or being swapped: skip the frame
       // The top row joined, then each of its lines alone: strict matches first, then loose ones. None when
-      // the strip sees a card's footer, which counts as no title in view.
-      const candidates = frameCandidates(g, lines);
+      // the strip sees a card's footer: no title is in view, and the reads either side of it don't add up.
+      const { candidates, footer } = frameCandidates(g, lines);
+      if (footer) {
+        tracker.current.breakStreak();
+        lastRead.current = formatLastRead('copyright line', null);
+      }
       const started = performance.now();
       const { match, matchedText, noMatch } = matchCandidates(g, candidates);
       if (candidates.length > 0) {

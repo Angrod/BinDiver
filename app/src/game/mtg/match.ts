@@ -1,3 +1,4 @@
+import { levenshtein } from '../../text/levenshtein';
 import { normalizeName } from './normalize';
 import type { NameKind } from './types';
 
@@ -97,49 +98,6 @@ export function buildNameIndex(entries: Array<[string, NameKind]>): NameIndex {
   });
   for (const list of byFirst.values()) list.sort((x, y) => norms[x].length - norms[y].length || x - y);
   return { norms, targets, kinds, byNorm, grams, byFirst, counts: new Int32Array(norms.length) };
-}
-
-// Rows reused across calls: matching runs on every camera read, so it doesn't allocate per name.
-let rowA = new Int32Array(64);
-let rowB = new Int32Array(64);
-
-/**
- * Levenshtein distance when it is at most maxD; otherwise some number above maxD. Only the band of
- * cells within maxD of the diagonal is filled, and it gives up once a whole row exceeds maxD.
- */
-export function levenshtein(a: string, b: string, maxD: number): number {
-  const n = a.length;
-  const m = b.length;
-  const far = maxD + 1;
-  if (Math.abs(n - m) > maxD) return far;
-  if (rowA.length < m + 2) {
-    rowA = new Int32Array(m + 2);
-    rowB = new Int32Array(m + 2);
-  }
-  let prev = rowA;
-  let cur = rowB;
-  for (let j = 0; j <= m + 1; j++) prev[j] = j <= maxD ? j : far;
-  for (let i = 1; i <= n; i++) {
-    const lo = Math.max(1, i - maxD);
-    const hi = Math.min(m, i + maxD);
-    cur[lo - 1] = lo === 1 && i <= maxD ? i : far;
-    let rowMin = cur[lo - 1];
-    const ca = a.charCodeAt(i - 1);
-    for (let j = lo; j <= hi; j++) {
-      let v = prev[j - 1] + (ca === b.charCodeAt(j - 1) ? 0 : 1);
-      if (prev[j] + 1 < v) v = prev[j] + 1;
-      if (cur[j - 1] + 1 < v) v = cur[j - 1] + 1;
-      if (v > far) v = far;
-      cur[j] = v;
-      if (v < rowMin) rowMin = v;
-    }
-    if (hi < m) cur[hi + 1] = far;
-    if (rowMin > maxD) return far;
-    const t = prev;
-    prev = cur;
-    cur = t;
-  }
-  return prev[m];
 }
 
 interface Tolerant { idx: number; similarity: number; shared: number }
@@ -276,13 +234,16 @@ export function looseLine(index: NameIndex, raw: string): LineMatch | null {
   return toMatch(index, best, 'loose');
 }
 
+/**
+ * Stored names starting with the typed text, shortest first. Nothing for text that normalizes to nothing
+ * (Japanese, Cyrillic, punctuation), which would otherwise match every name.
+ */
 export function prefixMatches(index: NameIndex, typed: string, limit: number): string[] {
   const prefix = normalizeName(typed);
-  const out: string[] = [];
+  if (prefix === '') return [];
+  const out = new Set<string>();
   index.norms.forEach((norm, i) => {
-    const target = index.targets[i];
-    if (index.kinds[i] !== 'token' && norm.startsWith(prefix) && !out.includes(target)) out.push(target);
+    if (index.kinds[i] !== 'token' && norm.startsWith(prefix)) out.add(index.targets[i]);
   });
-  out.sort((a, b) => a.length - b.length || (a < b ? -1 : a > b ? 1 : 0));
-  return out.slice(0, limit);
+  return [...out].sort((a, b) => a.length - b.length || (a < b ? -1 : a > b ? 1 : 0)).slice(0, limit);
 }

@@ -1,4 +1,4 @@
-import { levenshtein } from '../game/mtg/match';
+import { levenshtein } from '../text/levenshtein';
 import { normalizeLine } from './unmatched';
 
 /** Unmatched text at least this close to the card just committed is taken as more reads of it. */

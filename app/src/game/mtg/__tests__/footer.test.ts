@@ -11,6 +11,9 @@ describe('isFooterLine', () => {
       'Wizards of the Coast', 'C2026 Viacom.', 'C2026 Viacom', '5viacom', '5 5 mthe coust 28 viacom', 'of the Coast',
       'f the Coast', 'as bf the coast', 'Coast', 'he coast', 'e coast', '2016 wizards of the coast',
       '™ & © 1999 Wizards of the Coast, Inc.', '© 2025 MARVEL',
+      // Final review 2: one letter off, or with a digit after, these still matched Of the Coast, Wizards of
+      // the _____ or Roast.
+      'of the coust', 'of thc coast', 'of the Coast 2', 'wizards of the coasr', 'Coast 28', '2016 wizards of the coasr',
     ]) {
       expect([line, isFooterLine(line)]).toEqual([line, true]);
     }
@@ -19,7 +22,7 @@ describe('isFooterLine', () => {
     for (const line of [
       'Roast', 'Coast Watcher', 'Beyeen Coast', 'Coastal Tower', 'Wizards of the _____', '1996 World Champion',
       'The Ultimate Nightmare of Wizards of the Coast Customer Service', 'Ninja', 'Raphael, Most Attitude',
-      'Command Tower', 'Circle of Protection: Black',
+      'Command Tower', 'Circle of Protection: Black', 'Joust', 'Boast', 'Roast 2',
     ]) {
       expect([line, isFooterLine(line)]).toEqual([line, false]);
     }

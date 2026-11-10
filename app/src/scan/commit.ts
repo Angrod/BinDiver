@@ -22,6 +22,12 @@ export class CommitTracker {
     return null;
   }
 
+  /** Starts the count again (a frame that can't hold a title), keeping the committed card. */
+  breakStreak(): void {
+    this.lastKey = null;
+    this.streak = 0;
+  }
+
   get current(): string | null {
     return this.committed;
   }

@@ -111,10 +111,17 @@ describe('frameCandidates', () => {
   const line = (text: string, y: number): OcrLine => ({ text, x: 10, y, width: 100, height: 10 });
 
   test("a frame's top row, as titleCandidates gives it", () => {
-    expect(frameCandidates(footerGame, [line('Fireball', 5), line('Sorcery', 40)])).toEqual(['Fireball']);
+    expect(frameCandidates(footerGame, [line('Fireball', 5), line('Sorcery', 40)])).toEqual({
+      candidates: ['Fireball'], footer: false,
+    });
   });
   test('nothing when any line is the footer: the strip is over the bottom of a card', () => {
     // iPhone run 5: "Ninja" from a type line, read with the P/T and the copyright line below it.
-    expect(frameCandidates(footerGame, [line('Ninja', 5), line('2/3', 20), line('of the Coast', 30)])).toEqual([]);
+    expect(frameCandidates(footerGame, [line('Ninja', 5), line('2/3', 20), line('of the Coast', 30)])).toEqual({
+      candidates: [], footer: true,
+    });
+  });
+  test('an empty frame is no title, not a footer', () => {
+    expect(frameCandidates(footerGame, [])).toEqual({ candidates: [], footer: false });
   });
 });
