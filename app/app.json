@@ -25,7 +25,8 @@
       "package": "com.angrod.bindiver",
       "permissions": [
         "android.permission.CAMERA",
-        "android.permission.MODIFY_AUDIO_SETTINGS"
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.VIBRATE"
       ]
     },
     "web": {
