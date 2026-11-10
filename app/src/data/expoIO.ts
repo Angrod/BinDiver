@@ -8,8 +8,13 @@ function toHex(buf: ArrayBuffer): string {
   return Array.from(new Uint8Array(buf), (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-/** File operations for `refresh`, all inside `dir` (the cards directory). */
-export function createExpoRefreshIO(dir: Directory, closeLive: () => void): RefreshIO {
+/**
+ * File operations for `refresh`, all inside `dir` (the cards directory). `setLive` records the live
+ * slot in user.sqlite, and `closeLive` closes the open card database.
+ */
+export function createExpoRefreshIO(
+  dir: Directory, closeLive: () => void, setLive: (slot: 'a' | 'b') => void,
+): RefreshIO {
   const file = (name: string) => new File(dir, name);
   return {
     async fetchManifest(url) {
@@ -44,10 +49,8 @@ export function createExpoRefreshIO(dir: Directory, closeLive: () => void): Refr
         db.close();
       }
     },
+    setLive,
     closeLive,
-    move(from, to) {
-      file(from).moveSync(file(to), { overwrite: true });
-    },
     remove(name) {
       const f = file(name);
       if (f.exists) f.delete();
