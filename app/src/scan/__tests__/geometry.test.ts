@@ -70,15 +70,11 @@ describe('frameShape', () => {
   it("asks for 4:3 frames on Android, the shape of CameraX's default preview", () => {
     expect(frameShape('android')).toEqual({ resolution: 'FHD_4_3', aspect: 3 / 4 });
   });
-  it('maps the title band on a Pixel-shaped view to the band itself, since the frame fills the preview', () => {
+  it('maps the title band on a Pixel-shaped view to the scan region the Pixel 8 logged', () => {
+    // logcat on update 01a1c2a4: scanRegion=ScanRegion(left=17.18, top=16.89, width=65.65, height=14.01)
     const view = { width: 412, height: 397.5 };
-    const band = titleBand(cardOutline(view));
-    const frameH = view.width / frameShape('android').aspect;
-    expect(viewRectToFrameRegion(band, view, frameShape('android').aspect)).toEqual({
-      left: `${((band.x / view.width) * 100).toFixed(2)}%`,
-      top: `${(((band.y + (frameH - view.height) / 2) / frameH) * 100).toFixed(2)}%`,
-      width: `${((band.width / view.width) * 100).toFixed(2)}%`,
-      height: `${((band.height / frameH) * 100).toFixed(2)}%`,
+    expect(viewRectToFrameRegion(titleBand(cardOutline(view)), view, frameShape('android').aspect)).toEqual({
+      left: '17.18%', top: '16.89%', width: '65.65%', height: '14.01%',
     });
   });
 });

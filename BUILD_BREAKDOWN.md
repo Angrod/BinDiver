@@ -78,7 +78,7 @@ The camera test passes on both phones, so Plan 2 (the rest of the app) is next. 
 - **Matt's feedback:** reads feel instant once the title is in the orange strip, but the strip is tight to line a card up in.
 - **After the gate (Nov 9, iPhone):**
   - The strip was widened after Matt's feedback: it now runs from just above the outline to a fifth of the way down, a little wider than the outline.
-  - Run 4 (28 cards, including split, double-faced, foil and sleeved): 27 of 28 right, none wrong. The miss was "_____ _____ Rocketship", whose blanks the camera doesn't read. Blank-name cards now also match the words around their blanks: 10 of the 15 such cards; the other 5 share those words with other names.
+  - Run 4 (28 cards, including split, double-faced, foil and sleeved): 27 of 28 right, none wrong. The miss was "_____ _____ Rocketship", whose blanks the camera doesn't read. Blank-name cards now also match the words around their blanks: 10 of the 15 such cards. Of the other 5, three share their words with other names and two are only blanks.
   - Run 5 (side by side with the Pixel): 3 wrong cards came from the copyright line while the strip sat over the bottom of a card ("Wizards of the Coast" as Wizards of the _____, "Coast" as Roast, a type line as Ninja). A read that holds any piece of the copyright line now counts as no card. Of all card names, only the joke card "Of the Coast" is blocked, and typing still finds it.
   - Run 6 (28 cards, one phone): 28 of 28 right, 2.39 s a card, median read 0.5 s, slowest 1.3 s.
 - **Android (Pixel 8, Nov 9):**

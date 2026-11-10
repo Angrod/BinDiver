@@ -17,7 +17,9 @@ export interface FrameShape { resolution: 'FHD_16_9' | 'FHD_4_3'; aspect: number
 /**
  * The frame output's shape, matched to the camera preview's so the orange strip is the area read.
  * iOS gives the preview and the frames one format. Android's CameraX sizes the preview on its own, at 4:3
- * by default (VisionCamera 5.2 sets no preview resolution), so the frames are asked for at 4:3 there too.
+ * by default (VisionCamera 5.2.4 sets no preview resolution), so the frames are asked for at 4:3 there too.
+ * VisionCamera is pinned at 5.2.4 for this: re-check the Android preview's size after any upgrade (the
+ * Pixel 8 logged Preview 1600x1200 with ImageAnalysis 1920x1440).
  */
 export function frameShape(os: string): FrameShape {
   return os === 'android' ? { resolution: 'FHD_4_3', aspect: 3 / 4 } : { resolution: 'FHD_16_9', aspect: 9 / 16 };

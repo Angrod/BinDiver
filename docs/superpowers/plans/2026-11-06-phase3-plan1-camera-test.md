@@ -1182,12 +1182,12 @@ Run (in `app/`): `npx eas-cli@27 init --non-interactive --force && npx expo inst
   2. "Prices as of <date>" appears.
   3. Searching "fireb" suggests Fireball.
   4. The camera view shows the outline.
-  5. The frame line reads exactly `Frame 1080×1920`. Anything else means the crop is wrong.
+  5. The frame line reads exactly `Frame 1080×1920` on iPhone, or `Frame 1440×1920` on Android (4:3, the shape of CameraX's preview), with no "not the preview's shape" note. Anything else means the crop is wrong.
   6. A held-up Fireball commits with a tick, and the grey debug line shows what was read.
   7. The title is sharp when the card fills the outline (2× zoom, `CAMERA_ZOOM_X`).
   8. Reads still work with the phone tilted sideways.
 
-- [ ] **Step 8: Android.** Matt runs `npx eas-cli@27 build --profile preview --platform android` and installs the APK from the build page on his Android phone. He repeats Step 7 there. Known risk before the Android gate: the 2× zoom is probably lost when the camera stops and restarts (every sheet open/close). Re-apply zoom when the camera starts and show the zoom in the debug line; this is JavaScript-only and ships with `eas update`.
+- [ ] **Step 8: Android.** Matt runs `npx eas-cli@27 build --profile preview --platform android` and installs the APK from the build page on his Android phone. He repeats Step 7 there (the frame line reads `Frame 1440×1920`). Known risk before the Android gate: the 2× zoom is probably lost when the camera stops and restarts (every sheet open/close). Re-apply zoom when the camera starts and show the zoom in the debug line; this is JavaScript-only and ships with `eas update`.
 
 - [ ] **Step 9: Commit**
 
@@ -1224,6 +1224,7 @@ JavaScript-only fixes from here on ship with `npx eas-cli@27 update --channel pr
   - **Pass:** at least 95% of English titles right (2 or fewer wrong or missed in 50) and under 3 s a card on average. Then Plan 2 gets written.
   - **Fail:** follow spec section 2.4's fallbacks in order.
     - **Fallback 1:** tune `BAND_TOP`, `BAND_HEIGHT`, `OUTLINE_SHARE` and `frameSkipThreshold`. Ship with `eas update` and rerun.
+    - **iOS updates until the next iOS build (Nov 9):** the Android-only `enableMinifyInReleaseBuilds` setting changed the iOS runtime version, so an iOS update published from main's app.json reaches no installed iPhone. Publish iOS from app.json with that setting left out, after checking `npx expo-updates runtimeversion:resolve --platform ios` gives the iPhone build's `6bbbf078…`, then restore app.json. The next iOS build ends this.
     - **Fallbacks 2 to 4:** these need their own plan. Stop and talk to Matt.
 
 - [ ] **Step 5: Commit, and finish the branch**
