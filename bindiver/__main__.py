@@ -8,11 +8,13 @@
     python -m bindiver selftest scan.csv --min 10 --out data/selftest.html
     python -m bindiver check-log run.csv       # replay a phone test-mode run against the Mac's lookup
     python -m bindiver phone-db                # write the phone database, zip and manifest to data/
+    python -m bindiver nightly-check [--forced]  # print build=true/false (and append it to $GITHUB_OUTPUT)
     python -m bindiver golden --out DIR        # write the golden fixtures the phone port is tested against
 """
 
 import argparse
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -23,6 +25,7 @@ from bindiver.mtg.check_log import check_log, format_check
 from bindiver.mtg.golden import write_golden
 from bindiver.mtg.hand_notes import HAND_NOTES_FILE
 from bindiver.mtg.lookup import SORT_ORDERS, Catalog
+from bindiver.mtg import nightly
 from bindiver.mtg.manabox import read_manabox_names
 from bindiver.mtg.phone_db import build_phone_db, icon_uris_needed
 from bindiver.mtg.report import bulk_report, coverage_report, format_result
@@ -177,6 +180,14 @@ def cmd_golden(args):
     print(f"Wrote golden fixtures to {out}")
 
 
+def cmd_nightly_check(args):
+    line = f"build={'true' if nightly.nightly_check(args.forced, nightly.fetch_json) else 'false'}"
+    print(line)
+    if os.environ.get("GITHUB_OUTPUT"):
+        with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
+            out.write(line + "\n")
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(prog="bindiver", description="Which versions of this card are worth finding?")
     sub = parser.add_subparsers(required=True)
@@ -222,6 +233,10 @@ def main(argv=None):
     p = sub.add_parser("golden", help="write the golden fixtures the phone port is tested against")
     p.add_argument("--out", required=True, help="directory to write golden.sqlite and the JSON files into")
     p.set_defaults(func=cmd_golden)
+
+    p = sub.add_parser("nightly-check", help="say whether Scryfall has newer prices than the published data")
+    p.add_argument("--forced", action="store_true", help="say build=true even if the prices are unchanged")
+    p.set_defaults(func=cmd_nightly_check)
 
     args = parser.parse_args(argv)
     args.func(args)
