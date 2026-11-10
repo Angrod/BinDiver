@@ -64,6 +64,22 @@ describe('known cards', () => {
   });
 });
 
+describe('scannedCards latest name', () => {
+  it('uses the name of the latest scan when one card is scanned three times under two names', () => {
+    const s = createUserStore(memoryDb());
+    s.recordScan(scan({ at: '2', oracleIds: ['a'], name: 'Middle' }));
+    s.recordScan(scan({ at: '3', oracleIds: ['a'], name: 'Latest' }));
+    s.recordScan(scan({ at: '1', oracleIds: ['a'], name: 'Earliest' }));
+    expect(s.scannedCards()).toEqual([{ oracleIds: ['a'], name: 'Latest' }]);
+  });
+  it('breaks a tie on at by the highest id', () => {
+    const s = createUserStore(memoryDb());
+    s.recordScan(scan({ at: '1', oracleIds: ['a'], name: 'First' }));
+    s.recordScan(scan({ at: '1', oracleIds: ['a'], name: 'Second' }));
+    expect(s.scannedCards()).toEqual([{ oracleIds: ['a'], name: 'Second' }]);
+  });
+});
+
 describe('seedBasicsOnce', () => {
   it('runs once', () => {
     const s = createUserStore(memoryDb());

@@ -162,8 +162,11 @@ export function createUserStore(db: Db): UserStore {
     },
     scannedCards: () =>
       db.all<{ oracle_id: string; name: string }>(
-        `SELECT oracle_id, name FROM scans s WHERE oracle_id <> ''
-           AND id = (SELECT id FROM scans WHERE oracle_id = s.oracle_id ORDER BY at DESC, id DESC LIMIT 1)`,
+        `SELECT oracle_id, name FROM (
+           SELECT oracle_id, name,
+             ROW_NUMBER() OVER (PARTITION BY oracle_id ORDER BY at DESC, id DESC) AS rn
+           FROM scans WHERE oracle_id <> ''
+         ) WHERE rn = 1`,
       ).map((r) => ({ oracleIds: r.oracle_id.split(','), name: r.name })),
   };
 }
