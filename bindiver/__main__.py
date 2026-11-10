@@ -6,6 +6,7 @@
     python -m bindiver report scan.csv --min 5 --min 10 --min 20
     python -m bindiver coverage scan.csv --min 10
     python -m bindiver selftest scan.csv --min 10 --out data/selftest.html
+    python -m bindiver check-log run.csv       # replay a phone test-mode run against the Mac's lookup
     python -m bindiver phone-db                # write the phone database, zip and manifest to data/
     python -m bindiver golden --out DIR        # write the golden fixtures the phone port is tested against
 """
@@ -18,6 +19,7 @@ from pathlib import Path
 
 from bindiver.mtg.build_db import build_db, iter_bulk
 from bindiver.mtg.bulk_data import BULK_FILE, SETS_FILE, fetch_set_icons, price_date_of, read_local_meta, update, update_sets
+from bindiver.mtg.check_log import check_log, format_check
 from bindiver.mtg.golden import write_golden
 from bindiver.mtg.hand_notes import HAND_NOTES_FILE
 from bindiver.mtg.lookup import SORT_ORDERS, Catalog
@@ -154,6 +156,11 @@ def cmd_selftest(args):
     print(f"Wrote {out} ({out.stat().st_size / 1e3:.0f} KB): {len(picked)} cards, {len(icons)} set icons")
 
 
+def cmd_check_log(args):
+    catalog = _catalog()
+    print(format_check(check_log(catalog, DB_FILE, args.csv)))
+
+
 def cmd_phone_db(args):
     if not DB_FILE.exists():
         sys.exit("No card database yet. Run: python -m bindiver update")
@@ -204,6 +211,10 @@ def main(argv=None):
     p.add_argument("--min", type=float, default=10.0, help="price threshold in USD (default 10)")
     p.add_argument("--out", default=str(DATA_DIR / "selftest.html"))
     p.set_defaults(func=cmd_selftest)
+
+    p = sub.add_parser("check-log", help="replay a phone test-mode run CSV against the Mac's lookup")
+    p.add_argument("csv")
+    p.set_defaults(func=cmd_check_log)
 
     p = sub.add_parser("phone-db", help="write the slimmed phone database, its zip and manifest")
     p.set_defaults(func=cmd_phone_db)
