@@ -3,7 +3,7 @@ import pytest
 from bindiver.mtg.build_db import build_db
 from bindiver.mtg.check_log import LogCheck, check_log, format_check
 from bindiver.mtg.lookup import Catalog
-from tests.conftest import make_card
+from conftest import make_card
 
 
 def usd(amount):
@@ -29,12 +29,14 @@ def db(tmp_path):
     return path
 
 
-HEADER = "at,seconds_since_previous,seconds_to_read,source,raw_text,line_used,name,match,price_date,min_cents,alerted,marked_wrong,alert"
+# Copied verbatim from CSV_HEADER in app/src/user/runReport.ts.
+HEADER = ("at,seconds_since_previous,seconds_to_read,source,raw_text,line_used,name,match,price_date,"
+          "min_cents,alerted,alert,marked_wrong")
 
 
 def row(name, alert, wrong="no", date="2026-11-08"):
     alerted = "yes" if alert in ("full", "quiet") else "no"
-    return f"t,0,1,camera,{name},1,{name},exact,{date},1000,{alerted},{wrong},{alert}"
+    return f"t,0,1,camera,{name},1,{name},exact,{date},1000,{alerted},{alert},{wrong}"
 
 
 def write(tmp_path, *rows, header=HEADER):

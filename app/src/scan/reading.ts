@@ -1,4 +1,3 @@
-import type { CardGroup } from '../game/mtg/types';
 import type { CardMatch, Game } from '../game/types';
 import type { Size } from './geometry';
 import { titleCandidates, type OcrLine } from './lines';
@@ -45,11 +44,6 @@ export interface RawFrameSize {
 export function displayFrameSize(raw: RawFrameSize): Size {
   const sideways = raw.orientation === 'left' || raw.orientation === 'right';
   return sideways ? { width: raw.height, height: raw.width } : { width: raw.width, height: raw.height };
-}
-
-/** How many versions qualify across the card's groups. */
-export function qualifyingVersions(groups: CardGroup[]): number {
-  return groups.reduce((n, g) => n + g.qualifying.length, 0);
 }
 
 /** A read's match: the first candidate line that matched, and the lines that matched nothing. */

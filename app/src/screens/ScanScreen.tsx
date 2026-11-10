@@ -151,10 +151,10 @@ export function ScanScreen({ onOpenPrice, onOpenSettings }: Props) {
     return { outline, band, region: viewRectToFrameRegion(band, viewSize, FRAME_ASPECT) };
   }, [viewSize]);
 
-  // The camera (and with it the reader) is off while the Search or Run sheet is open,
+  // The camera (and with it the reader) is off while the Search, Run, Price or Settings sheet is open,
   // as well as when paused by a tap or with the app in the background.
   const cameraOn = hasPermission && device !== undefined && geometry !== null && appActive && !paused
-    && !searchOpen && !runOpen;
+    && !searchOpen && !runOpen && !priceOpen && !settingsOpen;
 
   /** A matched card's result at the current settings; null if the game is gone or the lookup throws. */
   const modelFor = useCallback((m: CardMatch): ResultModel | null => {

@@ -8,6 +8,7 @@
     python -m bindiver selftest scan.csv --min 10 --out data/selftest.html
     python -m bindiver check-log run.csv       # replay a phone test-mode run against the Mac's lookup
     python -m bindiver phone-db                # write the phone database, zip and manifest to data/
+    python -m bindiver phone-check             # exit 1 if the phone database in data/ looks broken
     python -m bindiver nightly-check [--forced]  # print build=true/false (and append it to $GITHUB_OUTPUT)
     python -m bindiver golden --out DIR        # write the golden fixtures the phone port is tested against
 """
@@ -27,7 +28,7 @@ from bindiver.mtg.hand_notes import HAND_NOTES_FILE
 from bindiver.mtg.lookup import SORT_ORDERS, Catalog
 from bindiver.mtg import nightly
 from bindiver.mtg.manabox import read_manabox_names
-from bindiver.mtg.phone_db import build_phone_db, icon_uris_needed
+from bindiver.mtg.phone_db import PHONE_DB, build_phone_db, icon_uris_needed
 from bindiver.mtg.report import bulk_report, coverage_report, format_result
 from bindiver.mtg.selftest import pick_names, render_html
 
@@ -180,6 +181,17 @@ def cmd_golden(args):
     print(f"Wrote golden fixtures to {out}")
 
 
+def cmd_phone_check(args):
+    manifest = json.loads((DATA_DIR / "manifest.json").read_text(encoding="utf-8"))
+    published = nightly.fetch_json(nightly.MANIFEST_URL)
+    problems = nightly.sanity_problems(DATA_DIR / PHONE_DB, manifest, published)
+    for problem in problems:
+        print(problem)
+    if problems:
+        sys.exit(1)
+    print("Phone database looks right.")
+
+
 def cmd_nightly_check(args):
     line = f"build={'true' if nightly.nightly_check(args.forced, nightly.fetch_json) else 'false'}"
     print(line)
@@ -233,6 +245,9 @@ def main(argv=None):
     p = sub.add_parser("golden", help="write the golden fixtures the phone port is tested against")
     p.add_argument("--out", required=True, help="directory to write golden.sqlite and the JSON files into")
     p.set_defaults(func=cmd_golden)
+
+    p = sub.add_parser("phone-check", help="check the phone database and manifest in data/ before they are published")
+    p.set_defaults(func=cmd_phone_check)
 
     p = sub.add_parser("nightly-check", help="say whether Scryfall has newer prices than the published data")
     p.add_argument("--forced", action="store_true", help="say build=true even if the prices are unchanged")
