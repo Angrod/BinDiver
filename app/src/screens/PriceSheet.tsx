@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { PRESET_CENTS } from '../alert/alert';
 import { dollars } from '../game/types';
@@ -42,14 +42,15 @@ export function PriceSheet({ visible, onClose }: Props) {
     setSetting('minCents', cents);
     return true;
   };
+  /** Done applies a typed amount and closes; an unparseable one keeps the sheet, price and text as they are. */
   const done = () => {
-    if (text.trim() !== '') applyTyped();
+    if (text.trim() !== '' && !applyTyped()) return;
     onClose();
   };
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.scrim}>
+      <KeyboardAvoidingView style={styles.scrim} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <Pressable style={styles.fill} onPress={onClose} accessibilityLabel="Close" />
         <SafeAreaView edges={['bottom']} style={[styles.sheet, { backgroundColor: theme.panel, borderColor: theme.greyPanelBorder }]}>
           <View style={[styles.grabber, { backgroundColor: theme.border }]} />
@@ -110,7 +111,7 @@ export function PriceSheet({ visible, onClose }: Props) {
 
           {rates !== null && <Text style={[styles.foot, { color: theme.muted }]}>{FOOTNOTE}</Text>}
         </SafeAreaView>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

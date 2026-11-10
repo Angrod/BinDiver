@@ -5,7 +5,6 @@ import { priceLabel } from '../alert/alert';
 import type { AlertStyle } from '../alert/signal';
 import type { SortOrder } from '../game/types';
 import { APP_TOO_OLD, useAppData } from '../state/AppData';
-import { useUpdateStatus } from '../updates/useUpdateStatus';
 import { KnownCardsScreen } from './KnownCardsScreen';
 import { PriceSheet } from './PriceSheet';
 import { formatBytes, formatPriceDate } from './resultView';
@@ -14,6 +13,8 @@ import { useTheme } from './theme';
 
 interface Props {
   visible: boolean;
+  /** The grey code-status line (from the scan screen's single useUpdateStatus). */
+  codeStatus: string;
   onClose(): void;
 }
 
@@ -27,12 +28,11 @@ const SORTS: ReadonlyArray<[SortOrder, string]> = [
 const SCRYFALL = 'Card data and prices from Scryfall.';
 const FAN_CONTENT = 'BinDiver is unofficial Fan Content permitted under the Fan Content Policy. Not approved/endorsed by Wizards. Portions of the materials used are property of Wizards of the Coast. ©Wizards of the Coast LLC.';
 
-export function SettingsScreen({ visible, onClose }: Props) {
+export function SettingsScreen({ visible, codeStatus, onClose }: Props) {
   const {
     user, priceDate, settings, setSetting, checkNow, lastCheckError, appTooOld, dataBytes,
   } = useAppData();
   const theme = useTheme();
-  const codeStatus = useUpdateStatus();
   const [priceOpen, setPriceOpen] = useState(false);
   const [knownOpen, setKnownOpen] = useState(false);
   const [offline, setOffline] = useState(false);

@@ -406,7 +406,7 @@ export function ScanScreen({ onOpenPrice, onOpenSettings }: Props) {
         onSearch={() => setSearchOpen(true)} searchDisabled={game === null} />
 
       <PriceSheet visible={priceOpen} onClose={() => setPriceOpen(false)} />
-      <SettingsScreen visible={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <SettingsScreen visible={settingsOpen} codeStatus={updateStatus} onClose={() => setSettingsOpen(false)} />
       <SearchSheet visible={searchOpen} onPick={onPick} onCancel={() => setSearchOpen(false)} />
       <RunScreen
         visible={runOpen}
