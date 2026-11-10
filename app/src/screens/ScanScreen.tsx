@@ -158,7 +158,7 @@ export function ScanScreen() {
         match: m.match,
         priceDate: priceDateRef.current ?? '',
         minCents: MIN_CENTS,
-        alerted: versions > 0,
+        alert: versions > 0 ? 'full' : 'none',
         readMs,
       });
       if (r !== null) setRunCount((n) => n + 1);
