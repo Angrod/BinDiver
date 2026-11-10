@@ -32,6 +32,10 @@ Hold the phone over a card in a bin. Within seconds, see which of that card's ve
 - **The iPhone 15 Pro** joins the iPhone 13 and the Pixel 8 for the phone tests. It needs registering (`eas device:create`) before Plan 2's builds.
 - **Quieting showcase and borderless versions too** waits for the 200-card test's alert numbers. In the camera runs it would have cut buzzes from 11 to 9 per 142 cards.
 
+**Decided with Matt on Nov 10, after the first look on the iPhone 13:**
+- **The camera takes most of the screen.** A small result card (label, name, count) sits over the bottom of the camera, and tapping it opens the full list (section 3.1). The outline keeps its size, so holding the phone feels the same.
+- **The iPhone 15 Pro waits** until Matt has it; Android follows once the iPhone layout is settled.
+
 **Not in Phase 3:** the watchlist and price refetch (Phase 4), reading non-English titles with the camera, art recognition, an App Store or Play Store release, accounts, analytics, condition.
 
 ## 1. How the pieces fit
@@ -203,8 +207,9 @@ Portrait, one hand. The mockup's five boards show each state.
 ### 3.1 Layout
 
 - **Top strip:** "Prices as of Nov 4" (amber after 3 days), the price chip ("$10+", tap to change), and a gear button for Settings.
-- **Camera (top half):** the outline and title strip. Tap to pause scanning, tap again to resume ("Tap to pause").
-- **Result (bottom half):**
+- **Camera (most of the screen, from Nov 10):** it fills the screen below the top strip, as tall as the camera's picture allows without cropping its sides. The outline and title strip keep the size and place they had when the camera took the top half (Matt's iPhone 13 walkthrough), so the holding distance and reading don't change; the extra height just shows more of the table. Tap to pause scanning, tap again to resume ("Tap to pause").
+- **Result card (over the bottom of the camera, from Nov 10):** a small card with the alert's border and label ("Worth finding", the quiet label, or "Known"), the card name, and the count line ("4 of 49 versions at $10+", or "Nothing at $10+"). The read-as line and the "This version" line appear on it when they apply. Tapping it opens the full list.
+- **Full list (a sheet over most of the screen):** the result panel below. The camera pauses while it is open and resumes when it closes. A camera read never opens it by itself.
   - It shows the last card read and stays until the next one, so Matt can lift the phone and read it.
   - **Header:** the card name, "4 of 49 versions at $10+", and the one-line value summary.
   - **Versions:** one row per qualifying version, in the chosen order. Each row has:
@@ -221,11 +226,9 @@ Portrait, one hand. The mockup's five boards show each state.
   - **Shorthand off:** each row shows its look-for text inline, as on the self-test page.
   - **Tolerant match:** "Read as “Bloodfell Caues”. Not this card? Tap Search."
   - **Nothing at the price:** a grey panel, "Nothing at $10+", "0 of 26 versions. No alert."
-- **Bottom bar:**
-  - The Shorthand switch.
-  - The sort menu: Oldest first (default), Newest first, Highest price.
-  - Search.
-  - The phone remembers the Shorthand and sort choices.
+- **Controls:**
+  - The Shorthand switch and the sort menu (Oldest first (default), Newest first, Highest price) sit at the top of the full list, since they only change the list. The phone remembers both.
+  - Search is a button on the camera view.
 - **Search:**
   - The camera pauses while you type.
   - The box sits at the top, so suggestions stay above the keyboard. Its hint reads "Name, or set and number (MOM 123), or number/total (38/143)". Below the box: "Cards from before 1998 have no number: type the English name."
