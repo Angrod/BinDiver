@@ -26,12 +26,18 @@ describe('rowViews', () => {
     expect(rows.map((r) => r.numberTag)).toEqual(['#57', '#178', null]);
   });
   it('fills finish, price, symbol and key fields', () => {
-    const rows = rowViews([a, b, c], byKey, 'b:foil');
+    const rows = rowViews([a, b, c], byKey, 'b');
     expect(rows[0]).toMatchObject({
       key: 'a:nonfoil', scryfallId: 'a', setName: 'The Zeta Set', finishTag: null, price: '$13.99',
       symbolSet: null, noSymbol: false, lookFor: 'Look for the thing', notes: [], sameAs: null, thisVersion: false,
     });
     expect(rows[1]).toMatchObject({ finishTag: 'foil', price: 'unpriced', symbolSet: 'none', noSymbol: true, thisVersion: true });
+  });
+  it('marks this version by Scryfall ID, in every finish', () => {
+    const bNonfoil = v({ scryfallId: 'b', collectorNumber: '178' });
+    const rows = rowViews([a, bNonfoil, b], new Map(), 'b');
+    expect(rows.map((r) => r.thisVersion)).toEqual([false, true, true]);
+    expect(rowViews([a, b], new Map(), 'b:foil').map((r) => r.thisVersion)).toEqual([false, false]);
   });
   it('tags etched', () => {
     const e = v({ scryfallId: 'e', finish: 'etched' });

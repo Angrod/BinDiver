@@ -39,6 +39,7 @@ function sameAsLine(keys: string[], byKey: Map<string, Version>): string | null 
   return `Looks the same as ${joined}. Check a reference image.`;
 }
 
+/** `thisVersion` is a Scryfall ID: every finish of that printing is "This version". */
 export function rowViews(list: Version[], byKey: Map<string, Version>, thisVersion: string | null): RowView[] {
   const perSet = new Map<string, number>();
   for (const v of list) perSet.set(v.setName, (perSet.get(v.setName) ?? 0) + 1);
@@ -54,7 +55,7 @@ export function rowViews(list: Version[], byKey: Map<string, Version>, thisVersi
     lookFor: v.lookFor,
     notes: v.notes,
     sameAs: sameAsLine(v.sameAs, byKey),
-    thisVersion: thisVersion !== null && v.key === thisVersion,
+    thisVersion: thisVersion !== null && v.scryfallId === thisVersion,
   }));
 }
 
