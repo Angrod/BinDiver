@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { openNodeDb } from '../../../testing/nodeDb';
+import { oldFormatCopy } from '../../../testing/oldFormat';
 import { createMtgGame } from '../index';
 import type { SortOrder } from '../types';
 import golden from '../__fixtures__/golden.json';
@@ -57,4 +58,43 @@ test('setIcon', () => {
   const row = db.get<{ code: string }>('SELECT code FROM sets WHERE icon_svg IS NOT NULL LIMIT 1')!;
   expect(game.setIcon(row.code)).toContain('<svg');
   expect(game.setIcon('none')).toBeNull();
+});
+
+test('quietKinds are the three labels in order', () => {
+  expect(game.quietKinds).toEqual(['old border', 'Secret Lair', 'serialized']);
+});
+test('numberSearch is on for the golden data', () => expect(game.numberSearch).toBe(true));
+test('explore at 1000 cents carries each version\'s quiet kind', () => {
+  const ids = db.all<{ oracle_id: string }>(
+    `SELECT DISTINCT p.oracle_id FROM printings p JOIN versions v ON v.printing_id = p.id
+     WHERE v.quiet_kind = 'Secret Lair' AND v.price_cents >= 1000`,
+  ).map((r) => r.oracle_id);
+  expect(ids.length).toBeGreaterThan(0);
+  const quals = game.lookup(ids, 1000, 'oldest').flatMap((g) => g.qualifying);
+  const secretLair = quals.filter((v) => v.quietKind === 'Secret Lair');
+  expect(secretLair.length).toBeGreaterThan(0);
+  for (const v of quals) {
+    const row = db.get<{ quiet_kind: string }>(
+      'SELECT quiet_kind FROM versions WHERE printing_id = ? AND finish = ?', [v.scryfallId, v.finish])!;
+    expect(v.quietKind).toBe(row.quiet_kind);
+  }
+});
+test('basicLands on golden is Island alone', () => {
+  const lands = game.basicLands();
+  expect(lands.map((l) => l.name)).toEqual(['Island']);
+  expect(lands[0].oracleId).toMatch(/\S/);
+});
+describe('old-format database', () => {
+  const old = oldFormatCopy(path.join(__dirname, '../__fixtures__/golden.sqlite'));
+  afterAll(() => old.close());
+  const oldGame = createMtgGame(old);
+  test('still matches and looks up, with no quiet kinds', () => {
+    const m = oldGame.matchTitle('Fireball');
+    expect(m).toMatchObject({ name: 'Fireball' });
+    const groups = oldGame.lookup(m!.oracleIds, 0, 'oldest');
+    const versions = groups.flatMap((g) => [...g.qualifying, ...g.unpriced]);
+    expect(versions.length).toBeGreaterThan(0);
+    expect(versions.every((v) => v.quietKind === '')).toBe(true);
+  });
+  test('numberSearch is off', () => expect(oldGame.numberSearch).toBe(false));
 });

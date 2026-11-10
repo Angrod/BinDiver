@@ -15,6 +15,7 @@ export interface Version {
   notes: string[];
   sameAs: string[];
   symbolSet: string | null;
+  quietKind: string; // '' when the data has none
   key: string; // `${scryfallId}:${finish}`
 }
 

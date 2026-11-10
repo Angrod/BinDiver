@@ -1,5 +1,12 @@
 import type { CardGroup, SortOrder } from './mtg/types';
 
+export type { CardGroup, SortOrder, Version } from './mtg/types';
+
+export interface KnownCard {
+  oracleId: string;
+  name: string;
+}
+
 export interface CardMatch {
   oracleIds: string[];
   name: string;
@@ -18,4 +25,10 @@ export interface Game {
   suggest(typed: string, limit: number): string[]; // display names
   lookup(oracleIds: string[], minCents: number, order: SortOrder): CardGroup[];
   setIcon(code: string): string | null;
+  /** Quiet kinds in label order: 'old border', 'Secret Lair', 'serialized'. */
+  readonly quietKinds: readonly string[];
+  /** Whether the card data supports set-and-number and number/total searches. */
+  readonly numberSearch: boolean;
+  /** The basic lands that start as known. */
+  basicLands(): KnownCard[];
 }

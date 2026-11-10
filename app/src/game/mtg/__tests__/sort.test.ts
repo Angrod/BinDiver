@@ -5,7 +5,7 @@ function v(setCode: string, collectorNumber: string, finish: string, priceCents:
   const scryfallId = `${setCode}-${collectorNumber}`;
   return {
     scryfallId, setCode, setName: setCode, collectorNumber, releasedAt, lang: 'en', finish,
-    priceCents, frameGroup: '', lookFor: '', notes: [], sameAs: [], symbolSet: null,
+    priceCents, frameGroup: '', lookFor: '', notes: [], sameAs: [], symbolSet: null, quietKind: '',
     key: `${scryfallId}:${finish}`,
   };
 }

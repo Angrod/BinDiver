@@ -1,6 +1,8 @@
 import type { Db } from '../../db/types';
 import type { CardMatch, Game } from '../types';
 import { isFooterLine } from './footer';
+import { basicLands } from './basics';
+import { dataFeatures } from './features';
 import { cardName, lookupGroups, resolveExact } from './lookup';
 import { buildNameIndex, looseLine, matchLine, prefixMatches } from './match';
 import { normalizeName } from './normalize';
@@ -8,6 +10,7 @@ import type { NameKind } from './types';
 
 export function createMtgGame(db: Db): Game {
   const rows = db.all<{ norm: string; kind: NameKind }>('SELECT norm, kind FROM names');
+  const features = dataFeatures(db);
   const index = buildNameIndex(rows.map((r): [string, NameKind] => [r.norm, r.kind]));
 
   // Turns a matched norm into a card; a token has no oracle IDs and is named by its norm.
@@ -49,7 +52,11 @@ export function createMtgGame(db: Db): Game {
       const f = find(typed);
       return f && !f.isToken ? [f.name] : [];
     },
-    lookup: (oracleIds, minCents, order) => lookupGroups(db, oracleIds, minCents, order),
+    quietKinds: ['old border', 'Secret Lair', 'serialized'],
+    numberSearch: features.numberSearch,
+    basicLands: () => basicLands(db),
+    lookup: (oracleIds, minCents, order) =>
+      lookupGroups(db, oracleIds, minCents, order, features.quietKind),
     setIcon(code) {
       if (code === 'none') return null;
       const row = db.get<{ icon_svg: string | null }>('SELECT icon_svg FROM sets WHERE code = ?', [code]);

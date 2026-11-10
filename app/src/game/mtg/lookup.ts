@@ -51,15 +51,18 @@ export function cardName(db: Db, oracleId: string): string {
 interface Row {
   id: string; name: string; set_code: string; set_name: string; collector_number: string;
   released_at: string; lang: string; finish: string; price_cents: number | null;
-  frame_group: string; look_for: string; notes: string | null; same_as: string; symbol_set: string | null;
+  frame_group: string; look_for: string; notes: string | null; same_as: string; symbol_set: string | null; quiet_kind: string;
 }
 
-export function lookupGroups(db: Db, oracleIds: string[], minCents: number, order: SortOrder): CardGroup[] {
+export function lookupGroups(db: Db, oracleIds: string[], minCents: number, order: SortOrder,
+  hasQuietKind = true,
+): CardGroup[] {
   return [...oracleIds].sort(byCodePoint).map((oracleId) => {
     const rows = db.all<Row>(
       `SELECT p.id, p.name, p.set_code, p.set_name, p.collector_number,
               p.released_at, p.lang, v.finish, v.price_cents,
-              v.frame_group, v.look_for, v.notes, v.same_as, p.symbol_set
+              v.frame_group, v.look_for, v.notes, v.same_as, p.symbol_set,
+              ${hasQuietKind ? 'v.quiet_kind' : "'' AS quiet_kind"}
        FROM printings p JOIN versions v ON v.printing_id = p.id
        WHERE p.oracle_id = ?`,
       [oracleId],
@@ -69,7 +72,7 @@ export function lookupGroups(db: Db, oracleIds: string[], minCents: number, orde
       collectorNumber: r.collector_number, releasedAt: r.released_at, lang: r.lang,
       finish: r.finish, priceCents: r.price_cents, frameGroup: r.frame_group,
       lookFor: r.look_for, notes: r.notes ? r.notes.split('\n') : [],
-      sameAs: JSON.parse(r.same_as) as string[], symbolSet: r.symbol_set,
+      sameAs: JSON.parse(r.same_as) as string[], symbolSet: r.symbol_set, quietKind: r.quiet_kind,
       key: `${r.id}:${r.finish}`,
     }));
     return {
