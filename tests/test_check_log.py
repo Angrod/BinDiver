@@ -126,4 +126,5 @@ def test_format_check_quiet_when_nothing_to_say():
     assert format_check(check).split("\n") == [
         "Checked 3 reads against prices as of 2026-11-08: 0 disagree.",
         "Phone alerts: 1 full, 0 quiet, 0 known, 2 none.",
+        "Full alerts only from showcase or borderless versions: 0",
     ]

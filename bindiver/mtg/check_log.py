@@ -91,9 +91,10 @@ def format_check(check: LogCheck) -> str:
         f"Phone alerts: {c.get('full', 0)} full, {c.get('quiet', 0)} quiet, "
         f"{c.get('known', 0)} known, {c.get('none', 0)} none.",
     ]
+    line = f"Full alerts only from showcase or borderless versions: {len(check.showcase_only)}"
     if check.showcase_only:
-        lines.append(f"Full alerts only from showcase or borderless versions: {len(check.showcase_only)} "
-                     f"({', '.join(check.showcase_only)})")
+        line += f" ({', '.join(check.showcase_only)})"
+    lines.append(line)
     if check.skipped:
         lines.append("Skipped: " + ", ".join(f"{name} ({reason})" for name, reason in check.skipped))
     for name, phone, mac in check.disagreements:
