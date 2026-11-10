@@ -252,6 +252,7 @@ Portrait, one hand. The mockup's five boards show each state.
   - **Quiet alert:** every one of those versions has a `quiet_kind`: an old-border printing (printed through Scourge, 2003), a Secret Lair version, or a serialized one. This gives a thinner amber outline, no vibration or sound, and a label naming the kinds, such as "Old border only · 3 versions at $10+" or "Old border or Secret Lair only · 4 versions at $10+". These are easy to rule out by eye (the old frame, the Secret Lair set symbol, the stamped serial number), and Secret Lair and serialized cards rarely reach bulk bins.
   - Retro-frame reprints (`frame_group` `retro`: 30th Anniversary, the Remastered sets, Modern Horizons, Time Spiral Timeshifted), showcase and borderless versions count as full alerts, because they are modern products found in modern bins.
   - For a known card, the same rule runs over its kept versions only.
+  - **The same list either way.** A quiet alert, a full alert and a known card all show every version at the price, and the folded unpriced ones, with the same rows and the same look-for text when a row is opened (section 3.1). The strength changes only the border, the label and the signal.
 - **On screen:**
   - The result panel gets a thick orange border and a "Worth finding" label.
   - The colour differs from the grey panel in lightness as well as hue, so it reads in poor light and for colourblind eyes.
