@@ -2,7 +2,7 @@ import { memo, useMemo, useState } from 'react';
 import { PixelRatio, Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import { resultModel, type ResultModel, type Shown } from '../scan/result';
 import { useAppData } from '../state/AppData';
-import { NOTE_MAX_LINES, noteLines, resultCardLines } from './resultCard';
+import { NOTE_MAX_LINES, hintLines, noteLines, resultCardLines } from './resultCard';
 import { Label } from './ResultPanel';
 import { useTheme } from './theme';
 import { Icon } from './VersionRow';
@@ -22,8 +22,8 @@ const NOTE_LINE = 18;
 
 /**
  * The small card over the bottom of the camera: the shown card's label, name and count at the current price
- * and known marks, with the read-as and "This version" lines when they apply. Tapping it opens the full list.
- * It never grows past `room`: notes are cut to fewer lines first.
+ * and known marks, with the value hint and the read-as and "This version" lines when they apply. Tapping it opens the full list.
+ * It never grows past `room`: the hint and notes are cut to fewer lines first.
  *
  * Like the panel, it only draws: it redraws when the price, sort or a known mark changes and never records
  * a scan or signals an alert.
@@ -64,9 +64,15 @@ export const ResultCard = memo(function ResultCard({ shown, onOpen, room }: Prop
   const border = kind === 'full' ? { borderWidth: 3, borderColor: theme.accent }
     : kind === 'quiet' ? { borderWidth: 1.5, borderColor: theme.quiet }
       : { borderWidth: 1, borderColor: theme.greyPanelBorder };
+  const lineHeight = NOTE_LINE * PixelRatio.getFontScale();
   const spare = head === null ? Infinity : room - 2 * (PAD_V + border.borderWidth) - head;
-  const noteMax = lines.notes.length === 0 ? NOTE_MAX_LINES
-    : noteLines(spare, lines.notes.length, NOTE_LINE * PixelRatio.getFontScale(), TEXT_GAP);
+  // The hint comes first: it keeps one line per note's worth of room (a note's gap and one line), then takes
+  // up to 3 lines (2 with notes). The notes share what is left, as before.
+  const noteCount = lines.notes.length;
+  const hintMax = lines.hint === null ? 0
+    : hintLines(spare - noteCount * (TEXT_GAP + lineHeight), noteCount > 0, lineHeight, TEXT_GAP);
+  const hintSpace = hintMax === 0 ? 0 : TEXT_GAP + hintMax * lineHeight;
+  const noteMax = noteCount === 0 ? NOTE_MAX_LINES : noteLines(spare - hintSpace, noteCount, lineHeight, TEXT_GAP);
   return (
     <Pressable style={[styles.card, border, { maxHeight: room, backgroundColor: theme.panel }]} onPress={onOpen}
       accessibilityRole="button">
@@ -80,6 +86,9 @@ export const ResultCard = memo(function ResultCard({ shown, onOpen, room }: Prop
           <Text style={[styles.name, { color: theme.text }]} numberOfLines={2}>{lines.name}</Text>
           <Text style={[styles.count, { color: theme.text }]} numberOfLines={1}>{lines.count}</Text>
         </View>
+        {lines.hint !== null && (
+          <Text style={[styles.note, { color: theme.muted }]} numberOfLines={hintMax}>{lines.hint}</Text>
+        )}
         {lines.notes.map((note) => (
           <Text key={note} style={[styles.note, { color: theme.muted }]} numberOfLines={noteMax}>{note}</Text>
         ))}
