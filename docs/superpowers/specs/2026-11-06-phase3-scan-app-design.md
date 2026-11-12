@@ -35,6 +35,7 @@ Hold the phone over a card in a bin. Within seconds, see which of that card's ve
 **Decided with Matt on Nov 10, after the first look on the iPhone 13:**
 - **The camera takes most of the screen.** A small result card (label, name, count) sits over the bottom of the camera, and tapping it opens the full list (section 3.1). The outline goes back to the camera test's size and centred place, so cards are held as in the camera test (about 17% closer than in the Nov 10 build).
 - **The iPhone 15 Pro waits** until Matt has it; Android follows once the iPhone layout is settled.
+- **The iPhone 15 Pro replaces the iPhone 13 (Nov 12).** It is Matt's phone now, so its 200-card result decides the phase. The 13 stays registered for builds; Apple only frees a device slot at the membership renewal anyway.
 
 **Not in Phase 3:** the watchlist and price refetch (Phase 4), reading non-English titles with the camera, art recognition, an App Store or Play Store release, accounts, analytics, condition.
 
@@ -366,7 +367,7 @@ None of these carries Matt's data: the update check's install ID is random, not 
    - Foreign cards are typed and don't count against the 95%.
 3. **Phone versus Mac:** Matt exports the run, and `python -m bindiver check-log run.csv` replays every read through the Python lookup at the run's price setting. It lists any card where the phone and the Mac disagree on alerting, and warns if their price dates differ.
 4. **Shop or dim light:** a mixed stack in a shop or a poorly lit room. Every card the camera misses or misreads must be found by typed search. All of them.
-5. **Android and the iPhone 15 Pro:** the 200-card stack on the Pixel 8 and the iPhone 15 Pro as well. The iPhone 13 result decides the phase.
+5. **Android and the iPhone 15 Pro:** the 200-card stack on the Pixel 8 and the iPhone 15 Pro as well. The iPhone 15 Pro result decides the phase (it replaced the iPhone 13 on Nov 12).
 6. **Alert numbers:** the 200-card run records how many cards give a full alert, a quiet alert and none. It also records how many full alerts come only from showcase or borderless versions. Whether those go quiet too is decided from these numbers.
 
 Results are recorded in `BUILD_BREAKDOWN.md`, as for Phases 1 and 2.
