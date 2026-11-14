@@ -8,6 +8,14 @@ dependencies = ["certifi"]
 [project.optional-dependencies]
 dev = ["pytest"]
 
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+# Only the Python package: setuptools would otherwise also find the Expo app's folder and refuse to install.
+[tool.setuptools.packages.find]
+include = ["bindiver*"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]

@@ -1,27 +1,34 @@
 """BinDiver command line.
 
     python -m bindiver update                  # fetch Scryfall data (max once a day) and rebuild
+    python -m bindiver update --offline        # rebuild from the saved files, no network
     python -m bindiver lookup "Fireball" --min 10 --sort price   # oldest (default), newest or price
     python -m bindiver report scan.csv --min 5 --min 10 --min 20
     python -m bindiver coverage scan.csv --min 10
     python -m bindiver selftest scan.csv --min 10 --out data/selftest.html
+    python -m bindiver check-log run.csv       # replay a phone test-mode run against the Mac's lookup
     python -m bindiver phone-db                # write the phone database, zip and manifest to data/
+    python -m bindiver phone-check             # exit 1 if the phone database in data/ looks broken
+    python -m bindiver nightly-check [--forced]  # print build=true/false (and append it to $GITHUB_OUTPUT)
     python -m bindiver golden --out DIR        # write the golden fixtures the phone port is tested against
 """
 
 import argparse
+import json
+import os
 import sys
 import time
-from datetime import datetime
 from pathlib import Path
 
 from bindiver.mtg.build_db import build_db, iter_bulk
-from bindiver.mtg.bulk_data import BULK_FILE, fetch_set_icons, read_local_meta, update, update_sets
+from bindiver.mtg.bulk_data import BULK_FILE, SETS_FILE, fetch_set_icons, price_date_of, read_local_meta, update, update_sets
+from bindiver.mtg.check_log import check_log, format_check
 from bindiver.mtg.golden import write_golden
 from bindiver.mtg.hand_notes import HAND_NOTES_FILE
 from bindiver.mtg.lookup import SORT_ORDERS, Catalog
+from bindiver.mtg import nightly
 from bindiver.mtg.manabox import read_manabox_names
-from bindiver.mtg.phone_db import build_phone_db, icon_uris_needed
+from bindiver.mtg.phone_db import PHONE_DB, build_phone_db, icon_uris_needed
 from bindiver.mtg.report import bulk_report, coverage_report, format_result
 from bindiver.mtg.selftest import pick_names, render_html
 
@@ -29,11 +36,26 @@ DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 DB_FILE = DATA_DIR / "cards.sqlite"
 
 
+def _saved_data():
+    """The saved bulk metadata and set list, or None when either is missing."""
+    meta = read_local_meta(DATA_DIR)
+    sets_path = DATA_DIR / SETS_FILE
+    if meta is None or not sets_path.exists():
+        return None
+    return meta, json.loads(sets_path.read_text(encoding="utf-8"))["data"]
+
+
 def cmd_update(args):
-    meta = update(DATA_DIR)
-    sets = update_sets(DATA_DIR)
-    price_date = datetime.fromisoformat(meta["updated_at"]).date().isoformat()
-    if needs_rebuild(args.force_build, DB_FILE.exists(), _db_price_date(), price_date,
+    if args.offline:
+        saved = _saved_data()
+        if saved is None:
+            sys.exit("No saved Scryfall data. Run: python -m bindiver update")
+        meta, sets = saved
+    else:
+        meta = update(DATA_DIR)
+        sets = update_sets(DATA_DIR)
+    price_date = price_date_of(meta["updated_at"])
+    if needs_rebuild(args.force_build or args.offline, DB_FILE.exists(), _db_price_date(), price_date,
                      _mtime(DB_FILE), _mtime(HAND_NOTES_FILE)):
         start = time.perf_counter()
         build_db(iter_bulk(DATA_DIR / BULK_FILE), DB_FILE, price_date=price_date, sets=sets)
@@ -138,6 +160,11 @@ def cmd_selftest(args):
     print(f"Wrote {out} ({out.stat().st_size / 1e3:.0f} KB): {len(picked)} cards, {len(icons)} set icons")
 
 
+def cmd_check_log(args):
+    catalog = _catalog()
+    print(format_check(check_log(catalog, DB_FILE, args.csv)))
+
+
 def cmd_phone_db(args):
     if not DB_FILE.exists():
         sys.exit("No card database yet. Run: python -m bindiver update")
@@ -154,12 +181,33 @@ def cmd_golden(args):
     print(f"Wrote golden fixtures to {out}")
 
 
+def cmd_phone_check(args):
+    manifest = json.loads((DATA_DIR / "manifest.json").read_text(encoding="utf-8"))
+    published = nightly.fetch_json(nightly.MANIFEST_URL)
+    problems = nightly.sanity_problems(DATA_DIR / PHONE_DB, manifest, published)
+    for problem in problems:
+        print(problem)
+    if problems:
+        sys.exit(1)
+    print("Phone database looks right.")
+
+
+def cmd_nightly_check(args):
+    line = f"build={'true' if nightly.nightly_check(args.forced, nightly.fetch_json) else 'false'}"
+    print(line)
+    if os.environ.get("GITHUB_OUTPUT"):
+        with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
+            out.write(line + "\n")
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(prog="bindiver", description="Which versions of this card are worth finding?")
     sub = parser.add_subparsers(required=True)
 
     p = sub.add_parser("update", help="download Scryfall data (at most daily) and rebuild the database")
     p.add_argument("--force-build", action="store_true", help="rebuild even if prices haven't changed")
+    p.add_argument("--offline", action="store_true",
+                   help="rebuild from the saved Scryfall files, with no network call")
     p.set_defaults(func=cmd_update)
 
     p = sub.add_parser("lookup", help="list versions of a card at or above a price")
@@ -187,12 +235,23 @@ def main(argv=None):
     p.add_argument("--out", default=str(DATA_DIR / "selftest.html"))
     p.set_defaults(func=cmd_selftest)
 
+    p = sub.add_parser("check-log", help="replay a phone test-mode run CSV against the Mac's lookup")
+    p.add_argument("csv")
+    p.set_defaults(func=cmd_check_log)
+
     p = sub.add_parser("phone-db", help="write the slimmed phone database, its zip and manifest")
     p.set_defaults(func=cmd_phone_db)
 
     p = sub.add_parser("golden", help="write the golden fixtures the phone port is tested against")
     p.add_argument("--out", required=True, help="directory to write golden.sqlite and the JSON files into")
     p.set_defaults(func=cmd_golden)
+
+    p = sub.add_parser("phone-check", help="check the phone database and manifest in data/ before they are published")
+    p.set_defaults(func=cmd_phone_check)
+
+    p = sub.add_parser("nightly-check", help="say whether Scryfall has newer prices than the published data")
+    p.add_argument("--forced", action="store_true", help="say build=true even if the prices are unchanged")
+    p.set_defaults(func=cmd_nightly_check)
 
     args = parser.parse_args(argv)
     args.func(args)

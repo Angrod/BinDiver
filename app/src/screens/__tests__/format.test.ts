@@ -1,6 +1,6 @@
 import {
   formatCounters, formatElapsed, formatFrameSize, formatLastRead, formatReadRight, formatSecondsPerCard,
-  parseStackCount, showsReadAs, versionsLine,
+  parseStackCount, showsReadAs,
 } from '../format';
 
 describe('formatElapsed', () => {
@@ -42,11 +42,6 @@ describe('labels', () => {
     expect(formatFrameSize({ width: 1440, height: 1920 }, 3 / 4)).toBe('Frame 1440×1920');
     // A frame whose shape isn't the preview's reads somewhere other than the orange strip.
     expect(formatFrameSize({ width: 1080, height: 1920 }, 3 / 4)).toBe('Frame 1080×1920 · not the preview’s shape');
-  });
-  it('counts versions', () => {
-    expect(versionsLine(0)).toBe('0 versions at $10+');
-    expect(versionsLine(1)).toBe('1 version at $10+');
-    expect(versionsLine(7)).toBe('7 versions at $10+');
   });
 });
 

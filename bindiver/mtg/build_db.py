@@ -15,6 +15,7 @@ from pathlib import Path
 
 from .normalize import normalize_name
 from .hand_notes import HAND_NOTES_FILE, HandNotes, load_hand_notes
+from .quiet import quiet_kind
 from .spot import SpotVersion, printing_traits, spot_card
 
 # Not tracked as cards. Token and emblem names are still indexed so a scanned token
@@ -55,6 +56,7 @@ CREATE TABLE versions (
     notes TEXT NOT NULL DEFAULT '',
     same_as TEXT NOT NULL DEFAULT '[]',
     frame_group TEXT NOT NULL DEFAULT '',
+    quiet_kind TEXT NOT NULL DEFAULT '',
     PRIMARY KEY (printing_id, finish)
 );
 CREATE TABLE names (
@@ -66,7 +68,8 @@ CREATE TABLE names (
 CREATE TABLE sets (
     code TEXT PRIMARY KEY,
     name TEXT NOT NULL,
-    icon_svg_uri TEXT
+    icon_svg_uri TEXT,
+    printed_total INTEGER
 );
 """
 
@@ -133,10 +136,11 @@ def _spot_pass(conn, hand_notes):
         for v in versions:
             spot = spots[v.key]
             conn.execute(
-                "UPDATE versions SET look_for = ?, notes = ?, same_as = ?, frame_group = ?"
+                "UPDATE versions SET look_for = ?, notes = ?, same_as = ?, frame_group = ?, quiet_kind = ?"
                 " WHERE printing_id = ? AND finish = ?",
                 (spot.look_for, "\n".join(spot.notes), json.dumps(list(spot.same_as)),
-                 spot.frame_group, v.printing_id, v.finish),
+                 spot.frame_group, quiet_kind(spot.frame_group, v.set_name, v.promo_types),
+                 v.printing_id, v.finish),
             )
             conn.execute("UPDATE printings SET symbol_set = ? WHERE id = ?",
                          (spot.symbol_set, v.printing_id))
@@ -154,8 +158,9 @@ def build_db(cards, db_path, price_date, sets=(), hand_notes: HandNotes | None =
     try:
         conn.executescript(SCHEMA)
         conn.executemany(
-            "INSERT OR REPLACE INTO sets VALUES (?, ?, ?)",
-            [(s["code"], s["name"], s.get("icon_svg_uri")) for s in sets],
+            "INSERT OR REPLACE INTO sets VALUES (?, ?, ?, ?)",
+            [(s["code"], s["name"], s.get("icon_svg_uri"), s.get("printed_size") or s.get("card_count"))
+             for s in sets],
         )
         for card in cards:
             if "paper" not in card.get("games", []):

@@ -41,4 +41,4 @@ CREATE TABLE IF NOT EXISTS settings (
  * The log's version, kept in SQLite's user_version. USER_SCHEMA creates version 1 (and the first
  * build also set user_version = 1 on every launch); the store's migrations take it to this one.
  */
-export const USER_VERSION = 2;
+export const USER_VERSION = 3;

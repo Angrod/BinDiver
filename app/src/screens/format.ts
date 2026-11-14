@@ -50,10 +50,6 @@ export function showsReadAs(match: CardMatch['match']): boolean {
   return match === 'tolerant' || match === 'loose';
 }
 
-export function versionsLine(n: number): string {
-  return `${n} ${n === 1 ? 'version' : 'versions'} at $10+`;
-}
-
 /** A scan's local time of day, HH:MM:SS. */
 export function timeOfDay(iso: string): string {
   const d = new Date(iso);

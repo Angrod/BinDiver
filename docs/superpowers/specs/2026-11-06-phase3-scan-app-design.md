@@ -12,7 +12,7 @@ Hold the phone over a card in a bin. Within seconds, see which of that card's ve
 
 **Decisions made with Matt (Nov 6):**
 - **Live scanning, no tapping.** The result changes only after a new title has matched the same card 3 reads in a row.
-- **English titles only.** For a foreign card, Matt types the English name. Foreign cards in a test stack count as typed-search cards, not camera misses. Japanese is the first language to add after Phase 3; that needs Scryfall's all-languages names and a Japanese text reader.
+- **English titles only.** For a foreign card, Matt types the English name, or (from Plan 2) its set and number (section 3.1). Foreign cards in a test stack count as typed-search cards, not camera misses. Japanese is the first language to add after Phase 3; that needs Scryfall's all-languages names and a Japanese text reader.
 - **iPhone first, using Matt's Apple Developer account.**
   - Builds come from Expo's cloud service (EAS) as *internal distribution* builds. Matt installs one by scanning a QR code, after registering his iPhone once (`eas device:create`).
   - An install keeps working until its Apple provisioning profile expires, which is a year, and no Mac is needed to reinstall.
@@ -25,7 +25,19 @@ Hold the phone over a card in a bin. Within seconds, see which of that card's ve
 - **"Known" applies to the card** (decided Nov 3), with a per-version "Still alert for this version" switch.
 - **From the mockup (approved):** collector numbers on rows whose set names repeat, alert rates on the price presets, and a dark look that follows the phone's light or dark setting.
 
-**Not in Phase 3:** the watchlist and price refetch (Phase 4), non-English titles, art recognition, an App Store or Play Store release, accounts, analytics, condition.
+**Decisions made with Matt for Plan 2 (Nov 9, after the camera test):**
+- **Quiet alert for old-border, Secret Lair and serialized cards.** When every version at the price is one of these, the result shows without vibration or sound (section 3.2): an old-border printing (printed through Scourge, 2003), a Secret Lair version, or a serialized one. Retro-frame reprints, showcase and borderless versions still alert in full. In the camera runs, this cut buzzes from 30 to 11 per 142 cards.
+- **Basic lands start as known** (section 4.1), including the snow-covered basics and Wastes.
+- **Foreign cards** can be looked up by set code and collector number (2014 on) and by "number/total" plus artist (1998 to 2014), as well as by English name (section 3.1). Camera reading stays English-only.
+- **The iPhone 15 Pro** joins the iPhone 13 and the Pixel 8 for the phone tests. It needs registering (`eas device:create`) before Plan 2's builds.
+- **Quieting showcase and borderless versions too** waits for the 200-card test's alert numbers. In the camera runs it would have cut buzzes from 11 to 9 per 142 cards.
+
+**Decided with Matt on Nov 10, after the first look on the iPhone 13:**
+- **The camera takes most of the screen.** A small result card (label, name, count) sits over the bottom of the camera, and tapping it opens the full list (section 3.1). The outline goes back to the camera test's size and centred place, so cards are held as in the camera test (about 17% closer than in the Nov 10 build).
+- **The iPhone 15 Pro waits** until Matt has it; Android follows once the iPhone layout is settled.
+- **The iPhone 15 Pro replaces the iPhone 13 (Nov 12).** It is Matt's phone now, so its 200-card result decides the phase. The 13 stays registered for builds; Apple only frees a device slot at the membership renewal anyway.
+
+**Not in Phase 3:** the watchlist and price refetch (Phase 4), reading non-English titles with the camera, art recognition, an App Store or Play Store release, accounts, analytics, condition.
 
 ## 1. How the pieces fit
 
@@ -44,10 +56,13 @@ A new command, `python -m bindiver phone-db`, writes a slimmed copy of `data/car
 | Table | Contents |
 | --- | --- |
 | `meta` | As now (`price_date` and the rest), plus `phone_format` = `1` |
-| `printings` | Only `id`, `oracle_id`, `name`, `set_code`, `set_name`, `collector_number`, `released_at`, `lang`, `symbol_set`, with the `printings_oracle` index |
-| `versions` | As now |
+| `printings` | Only `id`, `oracle_id`, `name`, `set_code`, `set_name`, `collector_number`, `released_at`, `lang`, `symbol_set`, with the `printings_oracle` index. Plan 2 adds `artist_id` and an index on `(set_code, collector_number)` |
+| `versions` | As now. Plan 2 adds `quiet_kind`: `old border` (`frame_group` `old-1993` or `old-1997`), `Secret Lair` (a set whose name starts "Secret Lair": `sld`, `slc`, `slp`, `slu`, `pssc`) or `serialized` (`promo_types` includes `serialized`), checked in that order; empty for every other version |
 | `names` | As now |
-| `sets` | `code`, `name`, and `icon_svg` (the icon's SVG text, embedded so the phone never fetches icons) |
+| `sets` | `code`, `name`, and `icon_svg` (the icon's SVG text, embedded so the phone never fetches icons). Plan 2 adds `printed_total`: Scryfall's `printed_size`, or `card_count` when that is missing (only 169 of 1,067 sets have `printed_size`; M15 prints 269 but has a `card_count` of 284) |
+| `artists` (Plan 2) | `id`, `name`: each artist stored once (2,561 names for about 105k printings) |
+
+**Icons for dark mode:** 159 of the 743 set icons set `fill="#000"` themselves, and the rest set no fill. The build strips `fill="#000"`, so the app can colour every icon by setting one fill.
 
 It then runs `VACUUM`, zips the file, and writes a manifest. All three go in `data/` (already gitignored):
 - `cards-phone.sqlite`
@@ -66,6 +81,8 @@ Measured on the Nov 4 data without icons:
 
 `phone_format` goes up only when the app would misread the file. An app that finds a format it doesn't know keeps its current data (section 1.3).
 
+Plan 2's additions only add a table, columns and an index, and the app never reads the card database with `SELECT *`. So `phone_format` stays `1`, and builds from before Plan 2 keep getting new prices. The Plan 2 app checks for the `artists` table and hides the number searches when it's missing. If a change ever has to break old builds, the nightly job builds both formats until those builds are retired.
+
 ### 1.2 The nightly job
 
 - **When:** every 6 hours, plus a manual run button and a run whenever `bindiver/` changes on `main` (so hand-note fixes ship the same day). GitHub Actions is free for public repos.
@@ -81,7 +98,7 @@ Measured on the Nov 4 data without icons:
 
 ### 1.3 Data on the phone
 
-- **First launch:** the app explains that it needs one 22 MB download. On Wi-Fi it starts right away. On cellular it asks first ("Download on cellular?").
+- **First launch:** the app explains that it needs one download of about 25 MB. On Wi-Fi it starts right away. On cellular it asks first ("Download on cellular?").
 - **After that:** when the app opens or comes back to the front, and the last check was more than 24 hours ago, it fetches the manifest. It downloads only when the manifest's `price_date` is newer than the phone's.
 - **Wi-Fi only**, unless "Allow downloads on cellular" is on in Settings.
 - **Check now:** Matt can tap "Check for new prices now" at any time. On cellular with that setting off, it asks before downloading.
@@ -93,6 +110,8 @@ Measured on the Nov 4 data without icons:
   5. Only then replace the old file.
   
   If any step fails, the old copy stays in use and the app tries again at the next check.
+
+  **From Plan 2, two slots.** The database lives in one of two files, `cards-a.sqlite` and `cards-b.sqlite`, and `user.sqlite` records which one is live. A download goes into the other slot. Only once it opens and checks out does the record switch to it. The old slot is deleted after that, so a crash at any moment leaves at least one good copy. (The camera-test app moves the new file over the old one, and a move that overwrites deletes first.)
 - **Offline:** everything works from the last good copy.
 - **Price date:** the top strip always shows "Prices as of Nov 4". The date turns amber once it is more than 3 days old.
 - **Matt's own data** (known cards, scan history, settings) lives in a separate `user.sqlite` that a data download never touches.
@@ -189,8 +208,9 @@ Portrait, one hand. The mockup's five boards show each state.
 ### 3.1 Layout
 
 - **Top strip:** "Prices as of Nov 4" (amber after 3 days), the price chip ("$10+", tap to change), and a gear button for Settings.
-- **Camera (top half):** the outline and title strip. Tap to pause scanning, tap again to resume ("Tap to pause").
-- **Result (bottom half):**
+- **Camera (most of the screen, from Nov 10):** it fills the screen below the top strip, as tall as the camera's picture allows without cropping its sides. The outline is about 60% of the camera's width and centred in it, as in the camera test (Plan 1), so the title strip reads the same middle part of the camera's picture at the same holding distance; the extra height shows more of the table above and below the card. Tap to pause scanning, tap again to resume ("Tap to pause").
+- **Result card (over the bottom of the camera, from Nov 10):** a small card with the alert's border and label ("Worth finding", the quiet label, or "Known"), the card name, the count line ("4 of 49 versions at $10+", or "Nothing at $10+"), and, when some versions are at the price (from Nov 12), the value hint: the card's one-line summary without its counts, such as "Value sits in M15-frame foils and old-border 1993-frame nonfoils. Skip old-border 1997-frame nonfoils and retro-frame foils." It tells at a glance whether the copy in hand could be one of them. The read-as line and the "This version" line appear on it when they apply. Tapping it opens the full list.
+- **Full list (a sheet over most of the screen):** the result panel below. The camera pauses while it is open and resumes when it closes. A camera read never opens it by itself.
   - It shows the last card read and stays until the next one, so Matt can lift the phone and read it.
   - **Header:** the card name, "4 of 49 versions at $10+", and the one-line value summary.
   - **Versions:** one row per qualifying version, in the chosen order. Each row has:
@@ -207,14 +227,20 @@ Portrait, one hand. The mockup's five boards show each state.
   - **Shorthand off:** each row shows its look-for text inline, as on the self-test page.
   - **Tolerant match:** "Read as “Bloodfell Caues”. Not this card? Tap Search."
   - **Nothing at the price:** a grey panel, "Nothing at $10+", "0 of 26 versions. No alert."
-- **Bottom bar:**
-  - The Shorthand switch.
-  - The sort menu: Oldest first (default), Newest first, Highest price.
-  - Search.
-  - The phone remembers the Shorthand and sort choices.
+- **Controls:**
+  - The Shorthand switch and the sort menu (Oldest first (default), Newest first, Highest price) sit at the top of the full list, since they only change the list. The phone remembers both.
+  - Search is a button on the camera view.
 - **Search:**
   - The camera pauses while you type.
-  - The box ("Card name (English)") sits at the top, so suggestions stay above the keyboard. Names that start with what you typed come first, then tolerant matches.
+  - The box sits at the top, so suggestions stay above the keyboard. Its hint reads "Name, or set and number (MOM 123), or number/total (38/143)". Below the box: "Cards from before 1998 have no number: type the English name."
+  - **A name:** names that start with what you typed come first, then tolerant matches. Text with no Latin letters or digits suggests nothing.
+  - **Set code and number** (printed on cards from 2014 on, the same in every language), such as "MOM 123", "mom 0123" or "123 MOM":
+    - Leading zeros are dropped, since Scryfall stores "0123" as "123".
+    - Suffixes are kept: "250p", "325★", "30c".
+    - A stray single letter from the printed rarity ("R 0123 MOM") is ignored.
+    - The List's "KLD-242" style works too.
+    - The match opens that card's result, with the typed version marked "This version".
+  - **Number/total** (printed from Exodus, 1998; from 2014 the set code is printed beside it, so that works too), such as "38/143": every card numbered 38 in a set whose `printed_total` is 143, from printings released in 1998 or later, as a list of candidates. An "Artist" box below, with suggestions from the `artists` table, narrows the list. The artist is printed in Latin letters on Japanese cards too. Time Spiral Timeshifted has its own total, 121.
   - Picking a name shows its result in the same panel. Cancel resumes the camera.
   - A name that isn't in the data shows "No card by that name".
 - **Price sheet** (from the chip): "Alert at or above".
@@ -225,10 +251,17 @@ Portrait, one hand. The mockup's five boards show each state.
 ### 3.2 The alert
 
 - **When:** a newly read card has at least one *priced* version at or above the price, and isn't muted as known (section 4.1). Versions with no price never trigger an alert.
+- **Two strengths (from Plan 2):**
+  - **Full alert:** at least one of those versions has an empty `quiet_kind` (section 1.1). This gives the orange border, the "Worth finding" label, and the signal.
+  - **Quiet alert:** every one of those versions has a `quiet_kind`: an old-border printing (printed through Scourge, 2003), a Secret Lair version, or a serialized one. This gives a thinner amber outline, no vibration or sound, and a label naming the kinds, such as "Old border only · 3 versions at $10+" or "Old border or Secret Lair only · 4 versions at $10+". These are easy to rule out by eye (the old frame, the Secret Lair set symbol, the stamped serial number), and Secret Lair and serialized cards rarely reach bulk bins.
+  - Retro-frame reprints (`frame_group` `retro`: 30th Anniversary, the Remastered sets, Modern Horizons, Time Spiral Timeshifted), showcase and borderless versions count as full alerts, because they are modern products found in modern bins.
+  - For a known card, the same rule runs over its kept versions only.
+  - **The same list either way.** A quiet alert, a full alert and a known card all show every version at the price, and the folded unpriced ones, with the same rows and the same look-for text when a row is opened (section 3.1). The strength changes only the border, the label and the signal.
 - **On screen:**
   - The result panel gets a thick orange border and a "Worth finding" label.
   - The colour differs from the grey panel in lightness as well as hue, so it reads in poor light and for colourblind eyes.
-- **Signal:** vibration (default), sound, both, or screen only (Settings).
+- **Signal:** vibration (default), sound, both, or screen only (Settings). Quiet alerts never signal.
+- **Alert rates** on the price presets count full alerts only, since those are what make the phone buzz.
 - **No repeats:** the alert fires once per newly read card, never again for the same result.
 
 ## 4. Known cards and settings
@@ -241,6 +274,7 @@ Portrait, one hand. The mockup's five boards show each state.
   - Example: Island marked known, Alpha Islands kept on alert.
   - If a kept version is at or above the price, the card alerts again and the label reads "Known · 1 version still alerts".
 - **Settings → Known cards (N):** a searchable list with Unmark on each card.
+- **Basic lands start as known (from Plan 2).** On first launch, the app marks Plains, Island, Swamp, Mountain, Forest, Wastes and their snow-covered versions as known, once. In the camera runs, Island and Plains each had 50 to 70 versions at $10+, mostly modern promos and foils, so every basic in a bin would otherwise buzz. A setting records that this was done, so an Unmark sticks. Known marks live in `user.sqlite` by oracle ID, so a data download never touches them.
 
 ### 4.2 Settings
 
@@ -251,7 +285,7 @@ The gear button opens Settings:
 | Alert price | The same value as the price chip |
 | Alert style | Vibration (default), sound, both, screen only |
 | View | Shorthand on or off, sort order (both remembered) |
-| Card data | "Prices as of Nov 4", the file size, "Check for new prices now", "Allow downloads on cellular" (off by default), and the last check's error if it failed |
+| Card data | "Prices as of Nov 4", the file size, "Check for new prices now" (which says "No newer prices yet." when the published prices are no newer, from Nov 14), "Allow downloads on cellular" (off by default), and the last check's error if it failed |
 | Known cards | The list from section 4.1 |
 | Camera test | Test mode on or off (the tick and the run screen), and Export |
 | About | "Card data and prices from Scryfall." No Scryfall logo, since its rules forbid implying endorsement. Plus the Wizards Fan Content Policy notice: "BinDiver is unofficial Fan Content permitted under the Fan Content Policy. Not approved/endorsed by Wizards. Portions of the materials used are property of Wizards of the Coast. ©Wizards of the Coast LLC." |
@@ -262,7 +296,7 @@ The gear button opens Settings:
 | --- | --- |
 | `known_cards` | `oracle_id` (key), `name`, `marked_at` |
 | `known_kept_versions` | `oracle_id`, `version_key` (`scryfall_id:finish`), together the key |
-| `scans` | `id`, `at`, `run_id` (test runs only, else empty), `oracle_id`, `name`, `source` (`camera` or `search`), `raw_text`, `line_used`, `match` (`exact`, `tolerant`, `loose`, `typed`), `price_date`, `min_cents`, `alerted`, `marked_wrong`, `read_ms` (camera reads: how long the card took to read) |
+| `scans` | `id`, `at`, `run_id` (test runs only, else empty), `oracle_id`, `name`, `source` (`camera` or `search`), `raw_text`, `line_used`, `match` (`exact`, `tolerant`, `loose`, `typed`), `price_date`, `min_cents`, `alerted` (a full alert), `marked_wrong`, `read_ms` (camera reads: how long the card took to read), `alert` (from Plan 2: `full`, `quiet`, `known` or `none`) |
 | `test_runs` | `id`, `started_at`, `stopped_at`, `stack_count` |
 | `settings` | `key`, `value` |
 
@@ -333,7 +367,8 @@ None of these carries Matt's data: the update check's install ID is random, not 
    - Foreign cards are typed and don't count against the 95%.
 3. **Phone versus Mac:** Matt exports the run, and `python -m bindiver check-log run.csv` replays every read through the Python lookup at the run's price setting. It lists any card where the phone and the Mac disagree on alerting, and warns if their price dates differ.
 4. **Shop or dim light:** a mixed stack in a shop or a poorly lit room. Every card the camera misses or misreads must be found by typed search. All of them.
-5. **Android:** the camera test and the 200-card stack, once its build works. The iPhone result decides the phase.
+5. **Android and the iPhone 15 Pro:** the 200-card stack on the Pixel 8 and the iPhone 15 Pro as well. The iPhone 15 Pro result decides the phase (it replaced the iPhone 13 on Nov 12).
+6. **Alert numbers:** the 200-card run records how many cards give a full alert, a quiet alert and none. It also records how many full alerts come only from showcase or borderless versions. Whether those go quiet too is decided from these numbers.
 
 Results are recorded in `BUILD_BREAKDOWN.md`, as for Phases 1 and 2.
 
@@ -350,8 +385,15 @@ Results are recorded in `BUILD_BREAKDOWN.md`, as for Phases 1 and 2.
    - **Gate:** Matt's 50-card test passes (section 2.4).
 4. **Full app:**
    - the results panel, sort, price sheet, alert, known cards, search, settings
+   - the quiet alert, basics starting as known, and the set-and-number and number/total searches (the phone database gains `artists` and `printed_total`)
+   - the two-slot data swap
    - the nightly job and the test workflow
+   - new EAS builds for iOS (the iPhone 13 and the 15 Pro, registered first) and Android, since set icons need `react-native-svg`, a native library. The new iOS build also ends the camera test's workaround for publishing iOS updates.
 5. **Phone tests:** section 6.2, then the results go into `BUILD_BREAKDOWN.md`.
+
+**Before any store release (not in Phase 3):**
+- Turn Android's code shrinking (R8) back on, with keep rules for ML Kit, and re-run the camera test, since shrinking can strip what native libraries need.
+- Decide on the update check's per-install ID (section 4.3): accept it, or host updates without it.
 
 **Two implementation plans.**
 - **The first** covers steps 1 to 3 and ends at the camera gate.
@@ -361,7 +403,7 @@ Results are recorded in `BUILD_BREAKDOWN.md`, as for Phases 1 and 2.
 
 | File | Change |
 | --- | --- |
-| `bindiver/mtg/phone_db.py` (new) | Build the phone database, zip and manifest (section 1.1); the nightly skip rule |
+| `bindiver/mtg/phone_db.py` (new) | Build the phone database, zip and manifest (section 1.1); the nightly skip rule. Plan 2: `artists`, `printed_total`, the `(set_code, collector_number)` index, icon fills stripped |
 | `bindiver/mtg/golden.py` (new) | Write the golden fixture (section 6.1) |
 | `bindiver/mtg/check_log.py` (new) | Compare an exported phone run with the Python lookup |
 | `bindiver/__main__.py` | `phone-db`, `golden` and `check-log` commands |

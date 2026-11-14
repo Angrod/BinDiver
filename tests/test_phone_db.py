@@ -10,7 +10,7 @@ from bindiver.mtg.hand_notes import load_hand_notes
 from bindiver.mtg.phone_db import PRINTING_COLUMNS, build_phone_db, icon_uris_needed, write_phone_tables
 from conftest import CS_SETS, FIXTURES
 
-ICONS = {"7ed": b"<svg>7ed</svg>"}
+ICONS = {"7ed": b"<svg>7ed</svg>", "lea": b'<svg><path fill="#000" d="M0"/></svg>'}
 
 
 @pytest.fixture
@@ -39,7 +39,26 @@ def rows(db, sql):
 def test_printings_keep_only_phone_columns(src, built):
     phone = built[0] / "cards-phone.sqlite"
     assert [r[1] for r in rows(phone, "PRAGMA table_info(printings)")] == list(PRINTING_COLUMNS)
+    assert PRINTING_COLUMNS[-1] == "artist_id"
     assert rows(phone, "SELECT count(*) FROM printings") == rows(src, "SELECT count(*) FROM printings") == [(10,)]
+
+
+def test_artists_are_stored_once(src, built):
+    phone = built[0] / "cards-phone.sqlite"
+    assert rows(phone, "SELECT id, name FROM artists ORDER BY id") == [
+        (1, "Gao Yan"), (2, "Mark Poole"), (3, "Mark Romanoski")]
+    joined = sorted(rows(phone, "SELECT p.id, a.name FROM printings p JOIN artists a ON a.id = p.artist_id"))
+    assert joined == sorted(rows(src, "SELECT id, artist FROM printings"))
+
+
+def test_set_number_index_exists(built):
+    phone = built[0] / "cards-phone.sqlite"
+    assert [r[2] for r in rows(phone, "PRAGMA index_info(printings_set_number)")] == ["set_code", "collector_number"]
+
+
+def test_sets_carry_printed_total(built):
+    phone = built[0] / "cards-phone.sqlite"
+    assert dict(rows(phone, "SELECT code, printed_total FROM sets")) == {"7ed": 350, "lea": 295}
 
 
 def test_versions_and_names_are_copied_unchanged(src, built):
@@ -50,7 +69,13 @@ def test_versions_and_names_are_copied_unchanged(src, built):
 
 def test_sets_embed_icon_text(built):
     phone = built[0] / "cards-phone.sqlite"
-    assert dict(rows(phone, "SELECT code, icon_svg FROM sets")) == {"7ed": "<svg>7ed</svg>", "lea": None}
+    assert dict(rows(phone, "SELECT code, icon_svg FROM sets")) == {"7ed": "<svg>7ed</svg>", "lea": '<svg><path d="M0"/></svg>'}
+
+
+def test_icon_fills_are_stripped(built):
+    icons = dict(rows(built[0] / "cards-phone.sqlite", "SELECT code, icon_svg FROM sets"))
+    assert icons["lea"] == '<svg><path d="M0"/></svg>'
+    assert icons["7ed"] == "<svg>7ed</svg>"
 
 
 def test_meta_has_phone_format_and_price_date(built):
@@ -97,5 +122,5 @@ def test_oracle_filter_keeps_only_listed_cards(src, tmp_path):
     assert rows(dst, "SELECT count(*) FROM printings") == [(10,)]
     assert rows(dst, "SELECT count(*) FROM names WHERE norm = 'counterspell'") == [(1,)]
     write_phone_tables(src, dst, ICONS, oracle_ids={"nope"})
-    for table in ("printings", "names", "sets"):
+    for table in ("printings", "names", "sets", "artists"):
         assert rows(dst, f"SELECT count(*) FROM {table}") == [(0,)]

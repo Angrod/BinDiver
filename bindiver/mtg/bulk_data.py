@@ -62,6 +62,11 @@ def read_local_meta(data_dir):
     return json.loads((data_dir / META_FILE).read_text(encoding="utf-8"))
 
 
+def price_date_of(updated_at):
+    """The date part of Scryfall's updated_at timestamp."""
+    return datetime.fromisoformat(updated_at).date().isoformat()
+
+
 def update(data_dir, now=None):
     """Make sure data_dir holds a usable bulk file and return its metadata."""
     now = now or datetime.now(timezone.utc)

@@ -89,6 +89,16 @@ The camera test passes on both phones, so Plan 2 (the rest of the app) is next. 
 - **iOS updates until the next iOS build:** the Android-only shrinking setting changed the iOS runtime version, so the iOS update is published from app.json as the iPhone build saw it (that setting left out). The next iOS build ends this step.
 - **Not tested yet:** the iPhone 15 Pro (it needs registering and a new build), and foreign-language cards (Japanese titles need ML Kit's Japanese reader, which means a new native build).
 
+## Phase 3 full app: data and builds (Nov 10, 2026)
+
+Plan 2's code (the result panel, full and quiet alerts, known cards, search by set and number, the price sheet and Settings) is on branch `phase3-plan2`. It was first seen on the phones after these builds.
+
+- **Data:** prices as of Nov 10 are on `data-latest`: zip 25.6 MB (24.5 MB before), database 58.6 MB. The zip now holds quiet kinds, set totals, artists and a set-and-number index. `phone_format` is still 1, so camera-test builds keep working with it. Before uploading, the new `phone-check` command checked row counts, the priced share and the size against the published file.
+- **Quiet alerts on this data:** 16,778 old-border, 4,883 Secret Lair and 292 serialized versions. At $10, Fireball is now a quiet alert, because all its $10+ versions have old borders. Counterspell is the full-alert example.
+- **Android:** EAS preview build `99d71c9e` (Nov 10), started from the Mac.
+- **iOS:** Matt runs the preview build himself, as before. `react-native-svg` and the vibration permission give both platforms a new runtime, which ends the iOS update workaround above.
+- **iPhone 15 Pro:** not yet. Matt doesn't have it; it gets registered and built when it arrives.
+
 ## What gets built
 
 ### Phase 1: Prove the lookup (Mac only)

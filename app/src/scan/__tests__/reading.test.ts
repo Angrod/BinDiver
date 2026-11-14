@@ -1,7 +1,6 @@
-import type { CardGroup } from '../../game/mtg/types';
 import type { CardMatch } from '../../game/types';
 import {
-  commitKey, displayFrameSize, frameCandidates, frameMsPerUnit, matchCandidates, qualifyingVersions, readDue,
+  commitKey, displayFrameSize, frameCandidates, frameMsPerUnit, matchCandidates, readDue,
   READ_INTERVAL_MS,
 } from '../reading';
 import type { OcrLine } from '../lines';
@@ -30,14 +29,6 @@ describe('displayFrameSize', () => {
   it('keeps an upright or upside-down frame as it is', () => {
     expect(displayFrameSize({ width: 1080, height: 1920, orientation: 'up' })).toEqual({ width: 1080, height: 1920 });
     expect(displayFrameSize({ width: 1080, height: 1920, orientation: 'down' })).toEqual({ width: 1080, height: 1920 });
-  });
-});
-
-describe('qualifyingVersions', () => {
-  it('adds up qualifying versions across groups', () => {
-    const g = (q: number) => ({ qualifying: new Array(q).fill({}) }) as unknown as CardGroup;
-    expect(qualifyingVersions([])).toBe(0);
-    expect(qualifyingVersions([g(2), g(0), g(3)])).toBe(5);
   });
 });
 

@@ -64,3 +64,40 @@ def test_golden_command_is_accepted(tmp_path, monkeypatch, capsys):
     cli.main(["golden", "--out", str(tmp_path / "g")])
     assert seen["out"] == tmp_path / "g"
     assert "g" in capsys.readouterr().out
+
+
+def test_update_offline_rebuilds_from_saved_files_without_the_network(tmp_path, monkeypatch, capsys):
+    import gzip
+    import json
+    import bindiver.__main__ as cli
+    from bindiver.mtg import bulk_data
+    from bindiver.mtg.lookup import Catalog
+
+    card = {"object": "card", "id": "c1", "oracle_id": "o1", "name": "Bolt", "layout": "normal",
+            "games": ["paper"], "set": "lea", "set_name": "Limited Edition Alpha", "collector_number": "1",
+            "lang": "en", "released_at": "1993-08-05", "border_color": "black", "frame": "1993",
+            "finishes": ["nonfoil"], "prices": {"usd": "5.00"}}
+    with gzip.open(tmp_path / "default_cards.jsonl.gz", "wt", encoding="utf-8") as f:
+        f.write(json.dumps(card) + "\n")
+    (tmp_path / "default_cards.meta.json").write_text(json.dumps(
+        {"updated_at": "2026-11-08T09:08:00+00:00", "downloaded_at": "2026-11-09T10:00:00+00:00"}))
+    (tmp_path / "sets.json").write_text(json.dumps(
+        {"downloaded_at": "2026-11-09T10:00:00+00:00", "data": [{"code": "lea", "name": "Limited Edition Alpha"}]}))
+
+    def no_network(url):
+        raise AssertionError("network call")
+    monkeypatch.setattr(bulk_data, "_get", no_network)
+    monkeypatch.setattr(cli, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(cli, "DB_FILE", tmp_path / "cards.sqlite")
+
+    cli.main(["update", "--offline"])
+    assert Catalog(tmp_path / "cards.sqlite").price_date == "2026-11-08"
+    assert "Prices as of 2026-11-08" in capsys.readouterr().out
+
+
+def test_update_offline_without_saved_data_exits(tmp_path, monkeypatch):
+    import bindiver.__main__ as cli
+    monkeypatch.setattr(cli, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(cli, "DB_FILE", tmp_path / "cards.sqlite")
+    with pytest.raises(SystemExit, match="No saved Scryfall data"):
+        cli.main(["update", "--offline"])

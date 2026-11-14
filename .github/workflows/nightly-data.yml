@@ -1,0 +1,66 @@
+name: Nightly data
+
+on:
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['bindiver/**']
+
+permissions:
+  contents: write
+
+concurrency: nightly-data
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.14'
+      - run: pip install -e .
+      - name: Check for newer prices
+        id: check
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            python -m bindiver nightly-check
+          else
+            python -m bindiver nightly-check --forced
+          fi
+      - name: Restore set icons
+        if: steps.check.outputs.build == 'true'
+        uses: actions/cache@v6
+        with:
+          path: data/set_icons
+          key: set-icons-${{ github.run_id }}
+          restore-keys: set-icons-
+      - name: Install the test tools and run the tests
+        if: steps.check.outputs.build == 'true'
+        run: |
+          pip install -e '.[dev]'
+          pytest
+      - name: Rebuild the card database
+        if: steps.check.outputs.build == 'true'
+        run: python -m bindiver update
+      - name: Build the phone database
+        if: steps.check.outputs.build == 'true'
+        run: python -m bindiver phone-db
+      - name: Check the phone database before publishing
+        if: steps.check.outputs.build == 'true'
+        run: python -m bindiver phone-check
+      - name: Publish to data-latest
+        if: steps.check.outputs.build == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          zip_name=$(python -c "import json; print(json.load(open('data/manifest.json'))['file'])")
+          gh release upload data-latest "data/$zip_name" --clobber
+          gh release upload data-latest data/manifest.json --clobber
+          old_zips=$(gh release view data-latest --json assets --jq '.assets[].name' \
+            | grep '^cards-phone-.*\.zip$' | grep -vxF "$zip_name" || true)
+          for old in $old_zips; do
+            gh release delete-asset data-latest "$old" -y
+          done

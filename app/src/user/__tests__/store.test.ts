@@ -4,7 +4,7 @@ import { createUserStore, NewScan } from '../store';
 const scan = (o: Partial<NewScan> = {}): NewScan => ({
   at: '2026-11-06T10:00:00.000Z', runId: null, oracleIds: ['a', 'b'], name: 'Island',
   source: 'camera', rawText: 'Isl', lineUsed: 'Island', match: 'exact',
-  priceDate: '2026-11-04', minCents: 25, alerted: true, readMs: null, ...o,
+  priceDate: '2026-11-04', minCents: 25, alert: 'full', readMs: null, ...o,
 });
 
 // The log as version 1 of the app wrote it, before scans had read_ms.
@@ -34,7 +34,7 @@ describe('user store', () => {
     const run = s.startRun(5, 't0');
     const id = s.recordScan(scan({ runId: run }));
     const [r] = s.runScans(run);
-    expect(r).toEqual({ ...scan({ runId: run }), id, markedWrong: false });
+    expect(r).toEqual({ ...scan({ runId: run }), id, markedWrong: false, alerted: true });
     s.setMarkedWrong(id, true);
     expect(s.runScans(run)[0].markedWrong).toBe(true);
     s.setMarkedWrong(id, false);
@@ -78,7 +78,7 @@ describe('read times', () => {
     const db = memoryDb();
     db.exec(V1_LOG);
     const s = createUserStore(db);
-    expect(s.runScans(1)).toEqual([expect.objectContaining({ name: 'Island', readMs: null })]);
+    expect(s.runScans(1)).toEqual([expect.objectContaining({ name: 'Island', readMs: null, alert: '' })]);
     s.recordScan(scan({ runId: 1, at: 't2', readMs: 800 }));
     expect(createUserStore(db).runScans(1).map((x) => x.readMs)).toEqual([null, 800]);
   });
@@ -87,6 +87,28 @@ describe('read times', () => {
     createUserStore(db).recordScan(scan({ readMs: 500 }));
     db.exec('PRAGMA user_version = 1'); // what the first build's schema did on every launch
     expect(() => createUserStore(db)).not.toThrow();
-    expect(db.get<{ user_version: number }>('PRAGMA user_version')?.user_version).toBe(2);
+    expect(db.get<{ user_version: number }>('PRAGMA user_version')?.user_version).toBe(3);
+  });
+});
+
+describe('scan alerts', () => {
+  it('stores alert and alerted', () => {
+    const s = createUserStore(memoryDb());
+    const run = s.startRun(1, 't0');
+    for (const alert of ['full', 'quiet', 'known', 'none'] as const) s.recordScan(scan({ runId: run, alert }));
+    expect(s.runScans(run).map((x) => [x.alert, x.alerted])).toEqual([
+      ['full', true], ['quiet', false], ['known', false], ['none', false],
+    ]);
+  });
+  it('runs migration 3 on a version 2 log, and again on one already holding alert', () => {
+    const db = memoryDb();
+    db.exec(V1_LOG);
+    db.exec('ALTER TABLE scans ADD COLUMN read_ms INTEGER; PRAGMA user_version = 2');
+    createUserStore(db);
+    expect(db.get<{ user_version: number }>('PRAGMA user_version')?.user_version).toBe(3);
+    db.exec('PRAGMA user_version = 2');
+    expect(() => createUserStore(db)).not.toThrow();
+    expect(db.get<{ user_version: number }>('PRAGMA user_version')?.user_version).toBe(3);
+    expect(createUserStore(db).runScans(1)[0].alert).toBe('');
   });
 });

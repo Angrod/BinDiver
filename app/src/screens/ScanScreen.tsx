@@ -6,51 +6,72 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Camera, useCameraDevice, useCameraPermission, type CameraRef } from 'react-native-vision-camera';
-import { isStale } from '../data/policy';
+import { signalPlan } from '../alert/signal';
+import { useAlertSignal } from '../alert/useAlertSignal';
 import type { CardMatch } from '../game/types';
 import { CommitTracker } from '../scan/commit';
 import {
-  cameraZoom, cardOutline, frameShape, isEarlyZoomError, titleBand, viewRectToFrameRegion, zoomToApply,
+  cameraHeight, cameraZoom, cardOutline, frameShape, isEarlyZoomError, titleBand, viewRectToFrameRegion, zoomToApply,
   type Rect, type Size,
 } from '../scan/geometry';
 import type { OcrLine } from '../scan/lines';
-import { commitKey, frameCandidates, matchCandidates, qualifyingVersions } from '../scan/reading';
+import { commitKey, frameCandidates, matchCandidates } from '../scan/reading';
 import { ReadTimer } from '../scan/readTimer';
+import { resultModel, scanAlert, type ResultModel, type Shown } from '../scan/result';
 import { normalizeLine, UnmatchedLines, type UnmatchedRow } from '../scan/unmatched';
 import { useTitleReader } from '../scan/useTitleReader';
 import { useAppData } from '../state/AppData';
 import { useUpdateStatus } from '../updates/useUpdateStatus';
 import type { TestRun } from '../user/store';
-import { formatCounters, formatElapsed, formatFrameSize, formatLastRead, showsReadAs, versionsLine } from './format';
+import { formatCounters, formatElapsed, formatFrameSize, formatLastRead } from './format';
+import { PriceSheet } from './PriceSheet';
+import { ResultCard } from './ResultCardView';
+import { ResultSheet } from './ResultSheet';
 import { RunScreen } from './RunScreen';
+import { TopStrip } from './ScanBars';
 import { SearchSheet } from './SearchSheet';
+import { SettingsScreen } from './SettingsScreen';
+import { useTheme } from './theme';
+import { Icon } from './VersionRow';
 
-const MIN_CENTS = 1000; // $10
 const DIAGNOSTICS_MS = 500; // the debug line and counters re-render at most this often
 const BAND = '#ff9f43';
-const AMBER = '#e5a50a';
+/** The "Tap to pause" hint sits inside the outline, this far above its bottom edge. */
+const HINT_GAP = 8;
+/** The result card's gap below the outline, and its margin above the bottom safe area. */
+const CARD_GAP = 16;
+const CARD_BOTTOM = 8;
+/** The Search button: round, beside the outline's lower right, just above the card. */
+const SEARCH_SIZE = 48;
+const SEARCH_RIGHT = 14;
+/** The test-mode box's margin from the camera's edges and from the title strip. */
+const TEST_BOX_MARGIN = 6;
 /** The camera frames' shape on this platform: the preview's, so the title strip is the area read. */
 const FRAME_ASPECT = frameShape(Platform.OS).aspect;
 
-/** What the bottom of the screen shows for the last card read or picked. */
-interface Shown {
-  name: string;
-  isToken: boolean;
-  versions: number;
-  match: CardMatch['match'];
-  lineUsed: string;
+interface Props {
+  /** The price chip: opens the price sheet. */
+  onOpenPrice?: () => void;
+  /** The gear: opens Settings. */
+  onOpenSettings?: () => void;
 }
 
-export function ScanScreen() {
+export function ScanScreen({ onOpenPrice, onOpenSettings }: Props) {
   useKeepAwake();
-  const { game, priceDate, user } = useAppData();
+  const { game, priceDate, user, settings, setSetting, marks } = useAppData();
+  const theme = useTheme();
   const updateStatus = useUpdateStatus();
+  const signal = useAlertSignal();
 
   // The frame handler runs outside React's render cycle, so it reads current values through refs.
   const gameRef = useRef(game);
   gameRef.current = game;
   const priceDateRef = useRef(priceDate);
   priceDateRef.current = priceDate;
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
+  const marksRef = useRef(marks);
+  marksRef.current = marks;
 
   const [run, setRun] = useState<TestRun | null>(() => user.currentRun());
   const runRef = useRef(run);
@@ -61,13 +82,19 @@ export function ScanScreen() {
   });
 
   const [shown, setShown] = useState<Shown | null>(null);
+  /** Counts shown cards, so the panel starts fresh (rows closed, scrolled to the top) for each. */
+  const [shownId, setShownId] = useState(0);
   const [paused, setPaused] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [runOpen, setRunOpen] = useState(false);
+  const [priceOpen, setPriceOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [listOpen, setListOpen] = useState(false);
+  const openList = useCallback(() => setListOpen(true), []);
   const [frameSize, setFrameSize] = useState<Size | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
 
-  // Tick
+  // Tick (test mode only)
   const tick = useAudioPlayer(require('../../assets/tick.wav'));
   useEffect(() => {
     setAudioModeAsync({ playsInSilentMode: true }).catch((e) => console.warn('audio mode failed', e));
@@ -123,30 +150,52 @@ export function ScanScreen() {
     checkZoom();
   }, [checkZoom]);
 
-  // Geometry: only once the camera view has a real size (a zero size would give NaN% regions).
-  const [viewSize, setViewSize] = useState<Size | null>(null);
-  const onCameraLayout = useCallback((e: LayoutChangeEvent) => {
+  // Geometry: only once the space below the top strip has a real size (a zero size would give NaN% regions).
+  // The camera view takes that space, but no more than the frame's height at its width (page background below).
+  const [area, setArea] = useState<Size | null>(null);
+  const onAreaLayout = useCallback((e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
     if (width > 0 && height > 0) {
-      setViewSize((prev) => (prev && prev.width === width && prev.height === height ? prev : { width, height }));
+      setArea((prev) => (prev && prev.width === width && prev.height === height ? prev : { width, height }));
     }
   }, []);
   const geometry = useMemo(() => {
-    if (!viewSize) return null;
-    const outline = cardOutline(viewSize);
+    if (!area) return null;
+    const view = { width: area.width, height: cameraHeight(area, FRAME_ASPECT) };
+    const outline = cardOutline(view);
     const band = titleBand(outline);
-    return { outline, band, region: viewRectToFrameRegion(band, viewSize, FRAME_ASPECT) };
-  }, [viewSize]);
+    return { view, outline, band, region: viewRectToFrameRegion(band, view, FRAME_ASPECT) };
+  }, [area]);
 
-  // The camera (and with it the reader) is off while the Search or Run sheet is open,
-  // as well as when paused by a tap or with the app in the background.
+  // The camera (and with it the reader) is off while the Search, Run, Price, Settings or full-list sheet is
+  // open, as well as when paused by a tap or with the app in the background.
   const cameraOn = hasPermission && device !== undefined && geometry !== null && appActive && !paused
-    && !searchOpen && !runOpen;
+    && !searchOpen && !runOpen && !priceOpen && !settingsOpen && !listOpen;
 
-  // Recording
-  const record = useCallback(
-    (m: CardMatch, source: 'camera' | 'search', rawText: string, versions: number, readMs: number | null) => {
-      const r = runRef.current;
+  /** A matched card's result at the current settings; null if the game is gone or the lookup throws. */
+  const modelFor = useCallback((m: CardMatch): ResultModel | null => {
+    const g = gameRef.current;
+    if (!g) return null;
+    const s = settingsRef.current;
+    try {
+      return resultModel(g, { match: m, thisVersion: null }, s.minCents, s.sort, marksRef.current);
+    } catch (e) {
+      console.warn('lookup failed', e);
+      return null;
+    }
+  }, []);
+
+  /**
+   * A newly read or picked card. This is the only place a scan is recorded and an alert signalled, and
+   * only the camera commit and the search pick call it. A new price, sort or known mark redraws the
+   * card and the list (ResultCard's and ResultPanel's useMemo) and never comes here.
+   */
+  const commitResult = useCallback(
+    (m: CardMatch, model: ResultModel, source: 'camera' | 'search', rawText: string, readMs: number | null,
+      thisVersion: string | null) => {
+      const s = settingsRef.current;
+      // A run left open stays open, but only test mode adds scans to it.
+      const r = s.testMode ? runRef.current : null;
       user.recordScan({
         at: new Date().toISOString(),
         runId: r?.id ?? null,
@@ -157,31 +206,17 @@ export function ScanScreen() {
         lineUsed: m.lineUsed,
         match: m.match,
         priceDate: priceDateRef.current ?? '',
-        minCents: MIN_CENTS,
-        alerted: versions > 0,
+        minCents: s.minCents,
+        alert: scanAlert(model),
         readMs,
       });
       if (r !== null) setRunCount((n) => n + 1);
+      signal(signalPlan(model.alert.kind, source, s.alertStyle));
+      setShown({ match: m, thisVersion });
+      setShownId((n) => n + 1);
     },
-    [user],
+    [signal, user],
   );
-
-  /** Looks up a matched card's qualifying versions; null if the game is gone or the lookup throws. */
-  const versionsFor = useCallback((m: CardMatch): number | null => {
-    if (m.isToken) return 0;
-    const g = gameRef.current;
-    if (!g) return null;
-    try {
-      return qualifyingVersions(g.lookup(m.oracleIds, MIN_CENTS, 'oldest'));
-    } catch (e) {
-      console.warn('lookup failed', e);
-      return null;
-    }
-  }, []);
-
-  const show = useCallback((m: CardMatch, versions: number) => {
-    setShown({ name: m.name, isToken: m.isToken, versions, match: m.match, lineUsed: m.lineUsed });
-  }, []);
 
   // Camera reads
   const tracker = useRef(new CommitTracker());
@@ -223,7 +258,7 @@ export function ScanScreen() {
       // Keep the lines only when the whole read found nothing: a joined row that missed while one of
       // its lines matched is a good read, not a line to tune for.
       const r = runRef.current;
-      if (r !== null && match === null && noMatch.length > 0) {
+      if (r !== null && settingsRef.current.testMode && match === null && noMatch.length > 0) {
         if (unmatched.current?.runId !== r.id) unmatched.current = { runId: r.id, lines: new UnmatchedLines() };
         for (const t of noMatch) unmatched.current.lines.add(t);
       }
@@ -232,19 +267,18 @@ export function ScanScreen() {
       readTimer.current.saw(atMs, matchedText || (candidates[0] ?? ''), key, match?.match === 'exact');
       const committed = tracker.current.push(key);
       if (committed === null || match === null) return;
-      const versions = versionsFor(match);
-      if (versions === null) {
+      const model = modelFor(match);
+      if (model === null) {
         // The lookup failed, so this read did not happen: start over so the card can commit again.
         tracker.current = new CommitTracker();
         readTimer.current.reset();
         return;
       }
       const readMs = readTimer.current.committed(atMs, committed, match.name);
-      record(match, 'camera', rawText, versions, readMs);
-      playTick();
-      show(match, versions);
+      commitResult(match, model, 'camera', rawText, readMs, null);
+      if (settingsRef.current.testMode) playTick();
     },
-    [playTick, record, show, versionsFor],
+    [commitResult, modelFor, playTick],
   );
 
   const { frameOutput, readCounts } = useTitleReader({ region: geometry?.region ?? null, active: cameraOn, onText });
@@ -252,34 +286,36 @@ export function ScanScreen() {
     if (!cameraOn) readTimer.current.interrupt();
   }, [cameraOn]);
 
-  // Diagnostics for the device run: one timer copies the last read and the counters into state.
+  // Diagnostics for the device run: one timer checks the zoom and, in test mode, copies the last read
+  // and the counters into state.
+  const testMode = settings.testMode;
   const [diag, setDiag] = useState<{ lastRead: string | null; counters: string }>(() => ({
     lastRead: null, counters: formatCounters(0, 0, null, null),
   }));
   useEffect(() => {
     const id = setInterval(() => {
-      const { ocrErrors, droppedFrames } = readCounts();
       // A stopped camera can't take a zoom, so only check it while the camera is on.
       const zoomNow = cameraOn ? checkZoom() : null;
+      if (!testMode) return;
+      const { ocrErrors, droppedFrames } = readCounts();
       const next = {
         lastRead: lastRead.current, counters: formatCounters(ocrErrors, droppedFrames, zoomNow, matchMs.current),
       };
       setDiag((d) => (d.lastRead === next.lastRead && d.counters === next.counters ? d : next));
     }, DIAGNOSTICS_MS);
     return () => clearInterval(id);
-  }, [readCounts, cameraOn, checkZoom]);
+  }, [readCounts, cameraOn, checkZoom, testMode]);
 
-  // Search
-  const onPick = (m: CardMatch) => {
+  // Search: a picked name, or (from a set-and-number search) a picked printing marked "This version".
+  const onPick = (m: CardMatch, thisVersion: string | null = null) => {
     setSearchOpen(false);
-    const versions = versionsFor(m);
-    if (versions === null) return;
-    record(m, 'search', m.name, versions, null);
-    show(m, versions);
+    const model = modelFor(m);
+    if (model === null) return;
+    commitResult(m, model, 'search', m.name, null, thisVersion);
   };
 
   // Test runs
-  const now = useNow(run !== null);
+  const now = useNow(run !== null && testMode);
   const startRun = (stackCount: number) => {
     const at = new Date().toISOString();
     const id = user.startRun(stackCount, at);
@@ -302,99 +338,113 @@ export function ScanScreen() {
     setRunOpen(true);
   };
 
-  const stale = priceDate !== null && isStale(priceDate, new Date());
-
   return (
-    <SafeAreaView style={styles.screen}>
-      <Text style={styles.prices}>
-        Prices as of <Text style={stale ? styles.stale : undefined}>{priceDate ?? 'unknown'}</Text>
-      </Text>
+    <SafeAreaView style={[styles.screen, { backgroundColor: theme.bg }]}>
+      <TopStrip theme={theme} priceDate={priceDate} minCents={settings.minCents}
+        onOpenPrice={() => { setPriceOpen(true); onOpenPrice?.(); }}
+        onOpenSettings={() => { setSettingsOpen(true); onOpenSettings?.(); }} />
 
-      <View style={styles.cameraBox} onLayout={onCameraLayout}>
-        {hasPermission && device !== undefined && geometry !== null && (
-          <Camera
-            ref={cameraRef}
-            style={StyleSheet.absoluteFill}
-            device={device}
-            isActive={cameraOn}
-            outputs={[frameOutput]}
-            constraints={[{ resolutionBias: frameOutput }]}
-            // The app is portrait-only: follow the interface, not the accelerometer, so tilting the
-            // phone over a bin never rotates the frames (and the OCR crop) away from the title band.
-            orientationSource="interface"
-            zoom={zoom}
-            resizeMode="cover"
-            onError={onCameraError}
-            onStarted={onCameraStarted}
-          />
-        )}
-        {hasPermission && geometry !== null && (
-          <Pressable
-            style={StyleSheet.absoluteFill}
-            onPress={() => setPaused((p) => !p)}
-            accessibilityRole="button"
-            accessibilityLabel={paused ? 'Resume scanning' : 'Pause scanning'}
-          >
-            <View style={[styles.outline, box(geometry.outline)]} />
-            <View style={[styles.band, box(geometry.band)]} />
-            {paused && (
-              <View style={styles.pausedCover}>
-                <Text style={styles.pausedText}>Paused</Text>
+      <View style={styles.cameraArea} onLayout={onAreaLayout}>
+        <View style={[styles.cameraBox, { backgroundColor: theme.camera }, geometry ? { height: geometry.view.height } : styles.fill]}>
+          {hasPermission && device !== undefined && geometry !== null && (
+            <Camera
+              ref={cameraRef}
+              style={StyleSheet.absoluteFill}
+              device={device}
+              isActive={cameraOn}
+              outputs={[frameOutput]}
+              constraints={[{ resolutionBias: frameOutput }]}
+              // The app is portrait-only: follow the interface, not the accelerometer, so tilting the
+              // phone over a bin never rotates the frames (and the OCR crop) away from the title band.
+              orientationSource="interface"
+              zoom={zoom}
+              resizeMode="cover"
+              onError={onCameraError}
+              onStarted={onCameraStarted}
+            />
+          )}
+          {hasPermission && geometry !== null && (
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={() => setPaused((p) => !p)}
+              accessibilityRole="button"
+              accessibilityLabel={paused ? 'Resume scanning' : 'Pause scanning'}
+            >
+              <View style={[styles.outline, box(geometry.outline)]} />
+              <View style={[styles.band, box(geometry.band)]} />
+              {paused && (
+                <View style={styles.pausedCover}>
+                  <Text style={styles.pausedText}>Paused</Text>
+                </View>
+              )}
+              <View style={[styles.hintBox, { bottom: geometry.view.height - bottomOf(geometry.outline) + HINT_GAP }]}>
+                <Text style={styles.hint}>{paused ? 'Tap to resume' : 'Tap to pause'}</Text>
               </View>
-            )}
-          </Pressable>
-        )}
-        {!hasPermission && !canRequestPermission && (
-          <View style={styles.cameraMessage}>
-            <Text style={styles.messageText}>BinDiver needs the camera to read card titles.</Text>
-            <Button title="Open Settings" onPress={() => void Linking.openSettings()} />
-          </View>
-        )}
-        {hasPermission && device === undefined && (
-          <View style={styles.cameraMessage}>
-            <Text style={styles.messageText}>No camera found.</Text>
-          </View>
-        )}
-        {cameraError !== null && <Text style={styles.cameraError}>{cameraError}</Text>}
-      </View>
+            </Pressable>
+          )}
+          {!hasPermission && !canRequestPermission && (
+            <View style={styles.cameraMessage}>
+              <Text style={styles.messageText}>BinDiver needs the camera to read card titles.</Text>
+              <Button title="Open Settings" onPress={() => void Linking.openSettings()} />
+            </View>
+          )}
+          {hasPermission && device === undefined && (
+            <View style={styles.cameraMessage}>
+              <Text style={styles.messageText}>No camera found.</Text>
+            </View>
+          )}
+          {cameraError !== null && <Text style={styles.cameraError}>{cameraError}</Text>}
 
-      <View style={styles.bottom}>
-        <Text style={styles.hint}>{paused ? 'Tap to resume' : 'Tap to pause'}</Text>
-        {frameSize && <Text style={styles.grey}>{formatFrameSize(frameSize, FRAME_ASPECT)}</Text>}
-        {diag.lastRead !== null && <Text style={styles.debug} numberOfLines={1}>{diag.lastRead}</Text>}
-        <Text style={styles.debug}>{diag.counters}</Text>
-        <Text style={styles.debug}>{updateStatus}</Text>
-        {game === null && <Text style={styles.grey}>Loading cards…</Text>}
+          {/* Test mode: across the top of the camera, above the title strip. */}
+          {testMode && geometry !== null && (
+            <View style={[styles.testBox, { maxHeight: geometry.band.y - 2 * TEST_BOX_MARGIN }]}>
+              <View style={styles.testLines}>
+                {frameSize && <Text style={styles.debug}>{formatFrameSize(frameSize, FRAME_ASPECT)}</Text>}
+                {diag.lastRead !== null && <Text style={styles.debug} numberOfLines={1}>{diag.lastRead}</Text>}
+                <Text style={styles.debug}>{diag.counters}</Text>
+                <Text style={styles.debug}>{updateStatus}</Text>
+              </View>
+              {run !== null ? (
+                <View style={styles.runBar}>
+                  <Text style={styles.runText}>
+                    {runCount} read · {formatElapsed(now - Date.parse(run.startedAt))}
+                  </Text>
+                  <Button title="Stop" onPress={stopRun} />
+                </View>
+              ) : (
+                <Button title="Run" onPress={() => setRunOpen(true)} />
+              )}
+            </View>
+          )}
 
-        <View style={styles.result}>
-          {shown ? (
-            <>
-              <Text style={styles.name} numberOfLines={2} adjustsFontSizeToFit>
-                {shown.name}
-              </Text>
-              <Text style={styles.detail}>{shown.isToken ? 'Token, not tracked' : versionsLine(shown.versions)}</Text>
-              {showsReadAs(shown.match) && <Text style={styles.grey}>Read as “{shown.lineUsed}”</Text>}
-            </>
-          ) : (
-            <Text style={styles.grey}>No card read yet</Text>
+          {geometry !== null && (
+            <Pressable
+              style={[styles.search, { top: bottomOf(geometry.outline) - SEARCH_SIZE },
+                { backgroundColor: theme.panel, borderColor: theme.border }, game === null && styles.disabled]}
+              onPress={() => setSearchOpen(true)}
+              disabled={game === null}
+              accessibilityRole="button"
+              accessibilityLabel="Search"
+              accessibilityState={{ disabled: game === null }}
+            >
+              <Icon name="search" size={20} color={theme.text} />
+            </Pressable>
           )}
         </View>
 
-        {run !== null && (
-          <View style={styles.runBar}>
-            <Text style={styles.runText}>
-              {runCount} read · {formatElapsed(now - Date.parse(run.startedAt))}
-            </Text>
-            <Button title="Stop" onPress={stopRun} />
+        {/* The result card: under the outline, down to the bottom safe area if it needs to (cutting its notes first). */}
+        {geometry !== null && area !== null && (
+          <View style={[styles.cardArea, { top: bottomOf(geometry.outline) + CARD_GAP }]} pointerEvents="box-none">
+            <ResultCard shown={shown} onOpen={openList}
+              room={area.height - CARD_BOTTOM - (bottomOf(geometry.outline) + CARD_GAP)} />
           </View>
         )}
-        <View style={styles.buttons}>
-          <Button title="Search" onPress={() => setSearchOpen(true)} disabled={game === null} />
-          {run === null && <Button title="Run" onPress={() => setRunOpen(true)} />}
-        </View>
       </View>
 
+      <PriceSheet visible={priceOpen} onClose={() => setPriceOpen(false)} />
+      <SettingsScreen visible={settingsOpen} codeStatus={updateStatus} onClose={() => setSettingsOpen(false)} />
       <SearchSheet visible={searchOpen} onPick={onPick} onCancel={() => setSearchOpen(false)} />
+      <ResultSheet visible={listOpen} shown={shown} shownId={shownId} onClose={() => setListOpen(false)} />
       <RunScreen
         visible={runOpen}
         unmatched={lastUnmatched}
@@ -406,6 +456,7 @@ export function ScanScreen() {
 }
 
 const box = (r: Rect) => ({ left: r.x, top: r.y, width: r.width, height: r.height });
+const bottomOf = (r: Rect) => r.y + r.height;
 
 /** Whether the app is in the foreground. */
 function useAppActive(): boolean {
@@ -430,10 +481,10 @@ function useNow(enabled: boolean): number {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#111' },
-  prices: { color: '#ddd', fontSize: 14, textAlign: 'center', paddingVertical: 6 },
-  stale: { color: AMBER, fontWeight: '600' },
-  cameraBox: { flex: 1, backgroundColor: '#000', overflow: 'hidden' },
+  screen: { flex: 1 },
+  cameraArea: { flex: 1 },
+  cameraBox: { overflow: 'hidden' },
+  fill: { flex: 1 },
   outline: { position: 'absolute', borderWidth: 2, borderColor: 'rgba(255,255,255,0.8)', borderRadius: 6 },
   band: { position: 'absolute', borderWidth: 2, borderColor: BAND, backgroundColor: 'rgba(255,159,67,0.18)' },
   pausedCover: {
@@ -443,17 +494,29 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   pausedText: { color: '#fff', fontSize: 22, fontWeight: '600' },
+  hintBox: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
+  hint: {
+    color: '#fff', fontSize: 12, backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 999,
+    paddingHorizontal: 8, paddingVertical: 2, overflow: 'hidden',
+  },
   cameraMessage: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 },
   messageText: { color: '#fff', fontSize: 17, textAlign: 'center' },
-  cameraError: { position: 'absolute', bottom: 6, left: 8, right: 8, color: '#f88', fontSize: 12 },
-  bottom: { flex: 1, paddingHorizontal: 16, paddingTop: 6, paddingBottom: 8, gap: 4 },
-  hint: { color: '#bbb', fontSize: 13, textAlign: 'center' },
-  grey: { color: '#888', fontSize: 13, textAlign: 'center' },
-  debug: { color: '#777', fontSize: 11, textAlign: 'center' },
-  result: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 4 },
-  name: { color: '#fff', fontSize: 30, fontWeight: '700', textAlign: 'center' },
-  detail: { color: '#ddd', fontSize: 18, textAlign: 'center' },
-  runBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 },
-  runText: { color: '#fff', fontSize: 17, fontVariant: ['tabular-nums'] },
-  buttons: { flexDirection: 'row', justifyContent: 'space-evenly' },
+  cameraError: { position: 'absolute', top: 6, left: 8, right: 8, color: '#f88', fontSize: 12 },
+  // maxHeight and overflow: the box is cut rather than reach the title strip.
+  testBox: {
+    position: 'absolute', top: TEST_BOX_MARGIN, left: TEST_BOX_MARGIN, right: TEST_BOX_MARGIN, overflow: 'hidden',
+    padding: 4, borderRadius: 8, backgroundColor: 'rgba(0,0,0,0.55)',
+    flexDirection: 'row', alignItems: 'flex-start', gap: 8,
+  },
+  testLines: { flex: 1, gap: 1 },
+  debug: { fontSize: 11, color: 'rgba(255,255,255,0.85)' },
+  runBar: { alignItems: 'center' },
+  runText: { fontSize: 13, color: '#fff', fontVariant: ['tabular-nums'] },
+  search: {
+    position: 'absolute', right: SEARCH_RIGHT, width: SEARCH_SIZE, height: SEARCH_SIZE, borderRadius: SEARCH_SIZE / 2,
+    borderWidth: 1, alignItems: 'center', justifyContent: 'center',
+  },
+  disabled: { opacity: 0.5 },
+  // Top-anchored under the outline; overflow: anything past the bottom safe area is cut, never moved up.
+  cardArea: { position: 'absolute', left: 10, right: 10, bottom: CARD_BOTTOM, overflow: 'hidden' },
 });
