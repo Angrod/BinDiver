@@ -34,8 +34,11 @@ export interface AppDataValue {
   markKnown(card: KnownCard): void;
   unmarkKnown(oracleId: string): void;
   setKept(oracleId: string, versionKey: string, kept: boolean): void;
-  /** 'ask' when downloads need the user's OK (cellular with them off) and it wasn't given. */
-  checkNow(confirmed: boolean): Promise<'ok' | 'ask' | 'offline'>;
+  /**
+   * 'ask' when downloads need the user's OK (cellular with them off) and it wasn't given; 'up-to-date' when the
+   * published prices are no newer than the phone's.
+   */
+  checkNow(confirmed: boolean): Promise<'ok' | 'up-to-date' | 'ask' | 'offline'>;
   /** The last failed check's error, until a check succeeds. */
   lastCheckError: string | null;
   appTooOld: boolean;
@@ -128,9 +131,12 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     setLastCheckError(error);
   }, [user]);
 
-  /** Runs refresh and opens the new slot after `updated`; returns the message to show, if any. */
-  const runRefresh = useCallback(async (): Promise<string | null> => {
-    if (busy.current) return null;
+  /**
+   * Runs refresh and opens the new slot after `updated`. Returns the message to show, if any, and whether the
+   * published prices were no newer than the phone's (false when another check was already running).
+   */
+  const runRefresh = useCallback(async (): Promise<{ message: string | null; upToDate: boolean }> => {
+    if (busy.current) return { message: null, upToDate: false };
     busy.current = true;
     try {
       const io = createExpoRefreshIO(cardsDir, closeLive, (slot) => user.setSetting(LIVE_SLOT_KEY, slot));
@@ -147,15 +153,15 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       }
       if (result.status === 'failed') {
         recordCheckError(result.error);
-        return result.error;
+        return { message: result.error, upToDate: false };
       }
       if (result.status === 'app-too-old') {
         setAppTooOld(true);
-        return APP_TOO_OLD;
+        return { message: APP_TOO_OLD, upToDate: false };
       }
       recordCheckError(null);
       setAppTooOld(false);
-      return null;
+      return { message: null, upToDate: result.status === 'up-to-date' };
     } finally {
       busy.current = false;
     }
@@ -206,7 +212,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         return;
       }
       setStatus('Downloading card data…');
-      const error = await runRefresh();
+      const { message: error } = await runRefresh();
       if (error) setStatus(error);
       else if (liveRef.current === null) setStatus('The download did not complete. Try again.');
     },
@@ -214,12 +220,12 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   );
 
   const checkNow = useCallback(
-    async (confirmed: boolean): Promise<'ok' | 'ask' | 'offline'> => {
+    async (confirmed: boolean): Promise<'ok' | 'up-to-date' | 'ask' | 'offline'> => {
       const perm = downloadPermission(await currentNetwork(), settings.allowCellular);
       if (perm === 'offline') return 'offline';
       if (perm === 'ask' && !confirmed) return 'ask';
-      await runRefresh();
-      return 'ok';
+      const { upToDate } = await runRefresh();
+      return upToDate ? 'up-to-date' : 'ok';
     },
     [runRefresh, settings.allowCellular],
   );

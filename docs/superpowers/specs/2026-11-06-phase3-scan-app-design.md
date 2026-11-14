@@ -285,7 +285,7 @@ The gear button opens Settings:
 | Alert price | The same value as the price chip |
 | Alert style | Vibration (default), sound, both, screen only |
 | View | Shorthand on or off, sort order (both remembered) |
-| Card data | "Prices as of Nov 4", the file size, "Check for new prices now", "Allow downloads on cellular" (off by default), and the last check's error if it failed |
+| Card data | "Prices as of Nov 4", the file size, "Check for new prices now" (which says "No newer prices yet." when the published prices are no newer, from Nov 14), "Allow downloads on cellular" (off by default), and the last check's error if it failed |
 | Known cards | The list from section 4.1 |
 | Camera test | Test mode on or off (the tick and the run screen), and Export |
 | About | "Card data and prices from Scryfall." No Scryfall logo, since its rules forbid implying endorsement. Plus the Wizards Fan Content Policy notice: "BinDiver is unofficial Fan Content permitted under the Fan Content Policy. Not approved/endorsed by Wizards. Portions of the materials used are property of Wizards of the Coast. ©Wizards of the Coast LLC." |
