@@ -76,6 +76,18 @@ export function readAsLine(lineUsed: string): string {
   return `Read as “${lineUsed}”. Not this card? Tap Search.`;
 }
 
+/**
+ * The result card's warning about cheaper look-alikes: one is named with how to spot it, several are
+ * counted. Null when there are none.
+ */
+export function cautionLine(lookAlikes: Version[], minCents: number): string | null {
+  if (lookAlikes.length === 0) return null;
+  if (lookAlikes.length > 1) return `Careful: ${lookAlikes.length} cheaper versions look alike. Compare them in the list.`;
+  const [v] = lookAlikes;
+  const under = `under ${priceLabel(minCents).replace(/\+$/, '')}`;
+  return `Careful: the ${v.setName} version looks alike and is ${under}${v.lookFor ? `: ${v.lookFor}` : ''}.`;
+}
+
 export function missingVersionLine(setCode: string, collectorNumber: string, minCents: number): string {
   return `This version (${setCode.toUpperCase()} #${collectorNumber}) isn't at ${priceLabel(minCents)}.`;
 }

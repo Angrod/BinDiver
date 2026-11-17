@@ -1,4 +1,5 @@
 import type { Db } from '../../db/types';
+import { findLookAlikes } from './lookAlikes';
 import { sortVersions } from './sort';
 import { summarize } from './summary';
 import type { CardGroup, NameKind, SortOrder, Version } from './types';
@@ -81,6 +82,7 @@ export function lookupGroups(db: Db, oracleIds: string[], minCents: number, orde
       qualifying: sortVersions(
         versions.filter((v) => v.priceCents !== null && v.priceCents >= minCents), order),
       unpriced: sortVersions(versions.filter((v) => v.priceCents === null), order),
+      lookAlikes: findLookAlikes(versions, minCents, order),
       totalVersions: versions.length,
       summary: summarize(versions, minCents),
       versionsByKey: new Map(versions.map((v) => [v.key, v])),

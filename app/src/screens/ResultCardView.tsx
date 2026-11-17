@@ -22,7 +22,7 @@ const NOTE_LINE = 18;
 
 /**
  * The small card over the bottom of the camera: the shown card's label, name and count at the current price
- * and known marks, with the value hint and the read-as and "This version" lines when they apply. Tapping it opens the full list.
+ * and known marks, with the look-alike warning, the value hint and the read-as and "This version" lines when they apply. Tapping it opens the full list.
  * It never grows past `room`: the hint and notes are cut to fewer lines first.
  *
  * Like the panel, it only draws: it redraws when the price, sort or a known mark changes and never records
@@ -66,13 +66,18 @@ export const ResultCard = memo(function ResultCard({ shown, onOpen, room }: Prop
       : { borderWidth: 1, borderColor: theme.greyPanelBorder };
   const lineHeight = NOTE_LINE * PixelRatio.getFontScale();
   const spare = head === null ? Infinity : room - 2 * (PAD_V + border.borderWidth) - head;
-  // The hint comes first: it keeps one line per note's worth of room (a note's gap and one line), then takes
-  // up to 3 lines (2 with notes). The notes share what is left, as before.
+  // The look-alike warning comes first, since it can save a bad buy: up to 2 lines, keeping one line per
+  // note's worth of room (a note's gap and one line). Then the hint, which keeps the same room and takes up
+  // to 3 lines (2 with notes). The notes share what is left, as before.
   const noteCount = lines.notes.length;
+  const noteRoom = noteCount * (TEXT_GAP + lineHeight);
+  const cautionMax = lines.caution === null ? 0 : noteLines(spare - noteRoom, 1, lineHeight, TEXT_GAP);
+  const cautionSpace = cautionMax === 0 ? 0 : TEXT_GAP + cautionMax * lineHeight;
   const hintMax = lines.hint === null ? 0
-    : hintLines(spare - noteCount * (TEXT_GAP + lineHeight), noteCount > 0, lineHeight, TEXT_GAP);
+    : hintLines(spare - cautionSpace - noteRoom, noteCount > 0, lineHeight, TEXT_GAP);
   const hintSpace = hintMax === 0 ? 0 : TEXT_GAP + hintMax * lineHeight;
-  const noteMax = noteCount === 0 ? NOTE_MAX_LINES : noteLines(spare - hintSpace, noteCount, lineHeight, TEXT_GAP);
+  const noteMax = noteCount === 0 ? NOTE_MAX_LINES
+    : noteLines(spare - cautionSpace - hintSpace, noteCount, lineHeight, TEXT_GAP);
   return (
     <Pressable style={[styles.card, border, { maxHeight: room, backgroundColor: theme.panel }]} onPress={onOpen}
       accessibilityRole="button">
@@ -86,6 +91,11 @@ export const ResultCard = memo(function ResultCard({ shown, onOpen, room }: Prop
           <Text style={[styles.name, { color: theme.text }]} numberOfLines={2}>{lines.name}</Text>
           <Text style={[styles.count, { color: theme.text }]} numberOfLines={1}>{lines.count}</Text>
         </View>
+        {lines.caution !== null && (
+          <Text style={[styles.note, styles.caution, { color: theme.text }]} numberOfLines={cautionMax}>
+            {lines.caution}
+          </Text>
+        )}
         {lines.hint !== null && (
           <Text style={[styles.note, { color: theme.muted }]} numberOfLines={hintMax}>{lines.hint}</Text>
         )}
@@ -111,4 +121,5 @@ const styles = StyleSheet.create({
   name: { fontSize: 20, fontWeight: '700', letterSpacing: -0.2 },
   count: { fontSize: 15, fontWeight: '500' },
   note: { fontSize: 13, lineHeight: NOTE_LINE },
+  caution: { fontWeight: '600' },
 });

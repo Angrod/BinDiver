@@ -24,6 +24,8 @@ export interface CardGroup {
   name: string;
   qualifying: Version[];
   unpriced: Version[];
+  /** Priced versions under the price in the same frame and finish as one at the price (findLookAlikes). */
+  lookAlikes: Version[];
   totalVersions: number;
   summary: string;
   versionsByKey: Map<string, Version>;

@@ -1,6 +1,6 @@
 import { missingVersion, type ResultModel, type Shown } from '../scan/result';
 import { showsReadAs } from './format';
-import { countLine, missingVersionLine, nothingLines, readAsLine } from './resultView';
+import { cautionLine, countLine, missingVersionLine, nothingLines, readAsLine } from './resultView';
 
 /** The small result card over the camera: the label, the card's name, its count and any notes. */
 export interface ResultCardLines {
@@ -13,6 +13,8 @@ export interface ResultCardLines {
   notes: string[];
   /** The group's value summary without its "(n of m)" counts; null unless one group has versions at the price and the card isn't known. */
   hint: string | null;
+  /** The warning about cheaper look-alikes of the versions at the price (cautionLine); null when there are none or the card is known. */
+  caution: string | null;
 }
 
 /** A value summary with every " (<n> of <m>)" removed, nothing else changed. */
@@ -24,7 +26,7 @@ export function valueHint(summary: string): string {
 export function resultCardLines(model: ResultModel, shown: Shown, minCents: number): ResultCardLines {
   const { match } = shown;
   const notes = showsReadAs(match.match) ? [readAsLine(match.lineUsed)] : [];
-  if (match.isToken) return { label: null, name: match.name, count: 'Token, not tracked', notes, hint: null };
+  if (match.isToken) return { label: null, name: match.name, count: 'Token, not tracked', notes, hint: null, caution: null };
 
   const qualifying = model.groups.reduce((n, g) => n + g.qualifying.length, 0);
   const total = model.groups.reduce((n, g) => n + g.totalVersions, 0);
@@ -33,7 +35,8 @@ export function resultCardLines(model: ResultModel, shown: Shown, minCents: numb
   if (missing !== null) notes.push(missingVersionLine(missing.setCode, missing.collectorNumber, minCents));
   const withVersions = model.groups.filter((g) => g.qualifying.length > 0);
   const hint = withVersions.length === 1 && !model.alert.known ? valueHint(withVersions[0].summary) : null;
-  return { label: model.alert.label, name: match.name, count, notes, hint };
+  const caution = model.alert.known ? null : cautionLine(withVersions.flatMap((g) => g.lookAlikes), minCents);
+  return { label: model.alert.label, name: match.name, count, notes, hint, caution };
 }
 
 /** The most lines a note wraps to on the card. */
