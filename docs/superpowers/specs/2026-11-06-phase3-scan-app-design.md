@@ -36,6 +36,7 @@ Hold the phone over a card in a bin. Within seconds, see which of that card's ve
 - **The camera takes most of the screen.** A small result card (label, name, count) sits over the bottom of the camera, and tapping it opens the full list (section 3.1). The outline goes back to the camera test's size and centred place, so cards are held as in the camera test (about 17% closer than in the Nov 10 build).
 - **The iPhone 15 Pro waits** until Matt has it; Android follows once the iPhone layout is settled.
 - **The iPhone 15 Pro replaces the iPhone 13 (Nov 12).** It is Matt's phone now, so its 200-card result decides the phase. The 13 stays registered for builds; Apple only frees a device slot at the membership renewal anyway.
+- **Search by artist (Nov 17).** The Artist box is always shown, and a number can be typed on its own: retro-frame reprints print only the number ("420"), with no set code or total (section 3.1).
 
 **Not in Phase 3:** the watchlist and price refetch (Phase 4), reading non-English titles with the camera, art recognition, an App Store or Play Store release, accounts, analytics, condition.
 
@@ -232,7 +233,7 @@ Portrait, one hand. The mockup's five boards show each state.
   - Search is a button on the camera view.
 - **Search:**
   - The camera pauses while you type.
-  - The box sits at the top, so suggestions stay above the keyboard. Its hint reads "Name, or set and number (MOM 123), or number/total (38/143)". Below the box: "Cards from before 1998 have no number: type the English name."
+  - The box sits at the top, so suggestions stay above the keyboard. Its hint reads "Name, set and number (MOM 123), number/total (38/143), or just the number (420)". Below it, an **Artist** box (from Nov 17, always shown) and the line "Cards from before 1998 have no number: type the English name or the artist."
   - **A name:** names that start with what you typed come first, then tolerant matches. Text with no Latin letters or digits suggests nothing.
   - **Set code and number** (printed on cards from 2014 on, the same in every language), such as "MOM 123", "mom 0123" or "123 MOM":
     - Leading zeros are dropped, since Scryfall stores "0123" as "123".
@@ -240,7 +241,10 @@ Portrait, one hand. The mockup's five boards show each state.
     - A stray single letter from the printed rarity ("R 0123 MOM") is ignored.
     - The List's "KLD-242" style works too.
     - The match opens that card's result, with the typed version marked "This version".
-  - **Number/total** (printed from Exodus, 1998; from 2014 the set code is printed beside it, so that works too), such as "38/143": every card numbered 38 in a set whose `printed_total` is 143, from printings released in 1998 or later, as a list of candidates. An "Artist" box below, with suggestions from the `artists` table, narrows the list. The artist is printed in Latin letters on Japanese cards too. Time Spiral Timeshifted has its own total, 121.
+  - **Number/total** (printed from Exodus, 1998; from 2014 the set code is printed beside it, so that works too), such as "38/143": every card numbered 38 in a set whose `printed_total` is 143, from printings released in 1998 or later, as a list of candidates. The artist, when picked, narrows the list. The artist is printed in Latin letters on Japanese cards too. Time Spiral Timeshifted has its own total, 121.
+  - **Just the number** (from Nov 17), such as "420", "0420" or "250p" (at most one suffix letter, so "7ed" stays a name): every printing with that number from 1998 on, oldest first, as candidates. Retro-frame reprints print only the number. A stray rarity letter ("R 420") is ignored.
+  - **The Artist box** (from Nov 17): suggests from all artists, matching the start of the name or of any word in it ("sid" finds Kevin Sidharta), accents ignored. A picked artist narrows either number search before the 50-candidate limit, so "420" with Kevin Sidharta lists only Skoa, Embermage. The artist alone, with the search box empty, lists that artist's cards by name, A to Z; picking one opens it like a typed name. Name and set-and-number searches ignore the artist. Changing the search text keeps the picked artist.
+  - **Notes under the list** for number searches: "No card with that number." (or "… by that artist."), and "Showing the first 50. Add the artist to narrow." when the list is full and no artist is picked. The artist alone with no cards: "No cards by that artist."
   - Picking a name shows its result in the same panel. Cancel resumes the camera.
   - A name that isn't in the data shows "No card by that name".
 - **Price sheet** (from the chip): "Alert at or above".

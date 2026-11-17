@@ -25,7 +25,12 @@ describe('parseSearch', () => {
     ['038 / 143', { kind: 'number-total', number: '38', total: 143 }],
     ['Fire 2', setNumber('fire', '2')],
     ['Fireball', { kind: 'name' }],
-    ['123', { kind: 'name' }],
+    ['123', { kind: 'number', number: '123' }],
+    ['0420', { kind: 'number', number: '420' }],
+    ['250p', { kind: 'number', number: '250p' }],
+    ['R 420', { kind: 'number', number: '420' }],
+    ['325*', { kind: 'number', number: '325★' }],
+    ['7ed', { kind: 'name' }],
     ['Jace, the Mind Sculptor', { kind: 'name' }],
     ['', { kind: 'name' }],
   ])('%j', (text, expected) => {
@@ -55,19 +60,47 @@ describe('game search', () => {
     expect(game.searchKind('2XM 44')).toBe('set-number');
     expect(game.searchKind('61/350')).toBe('number-total');
     expect(game.searchKind('Fireball')).toBe('name');
+    expect(game.searchKind('420')).toBe('number');
   });
+  const artistId = (name: string) => {
+    const a = game.artistOptions(name, 5).find((o) => o.name === name);
+    if (!a) throw new Error(`no artist ${name}`);
+    return a.id;
+  };
   test('numberCandidates', () => {
-    const c = game.numberCandidates('61/350');
+    const c = game.numberCandidates('61/350', null);
     const names = c.map((p) => `${p.name}:${p.setCode}`);
     expect(names).toContain('Counterspell:6ed');
     expect(names).toContain('Brainstorm:mmq');
     expect(c.every((p) => p.releasedAt >= '1998-01-01')).toBe(true);
-    expect(game.numberCandidates('77/460').some((p) => p.setCode === '5ed')).toBe(false);
-    expect(game.numberCandidates('Fireball')).toEqual([]);
+    expect(game.numberCandidates('77/460', null).some((p) => p.setCode === '5ed')).toBe(false);
+    expect(game.numberCandidates('Fireball', null)).toEqual([]);
   });
-  test('artistOptions', () => {
-    const c = game.numberCandidates('61/350');
-    expect(game.artistOptions(c, 'hann', 5)).toEqual([{ id: expect.any(Number), name: 'Hannibal King' }]);
+  test('a bare number: every printing so numbered from 1998 on, oldest first', () => {
+    const c = game.numberCandidates('61', null);
+    expect(c.map((p) => `${p.name}:${p.setCode}`)).toEqual([
+      'Counterspell:6ed', 'Brainstorm:mmq', 'Brainstorm:cst', 'Island:ddo', 'Island:gnt', 'Counterspell:fdc',
+    ]);
+  });
+  test('the artist narrows a number, before the limit is applied', () => {
+    expect(game.numberCandidates('61', artistId('Hannibal King')).map((p) => p.setCode)).toEqual(['6ed']);
+    expect(game.numberCandidates('61/350', artistId('Hannibal King')).map((p) => p.setCode)).toEqual(['6ed']);
+    expect(game.numberCandidates('61', artistId('Christopher Rush')).map((p) => p.setCode)).toEqual(['cst']);
+  });
+  test('artistOptions: every artist whose name or a word of it starts with the text, A to Z', () => {
+    expect(game.artistOptions('hann', 5)).toEqual([{ id: expect.any(Number), name: 'Hannibal King' }]);
+    expect(game.artistOptions('king', 5).map((o) => o.name)).toContain('Hannibal King');
+    expect(game.artistOptions('christopher', 5).map((o) => o.name)).toEqual(['Christopher Moeller', 'Christopher Rush']);
+    expect(game.artistOptions('christopher', 1)).toHaveLength(1);
+    expect(game.artistOptions('honore', 5).map((o) => o.name)).toEqual(['Alexandre Honoré']);
+    expect(game.artistOptions('  ', 5)).toEqual([]);
+  });
+  test('artistCards: the names of an artist\'s cards, A to Z, once each', () => {
+    expect(game.artistCards(artistId('Hannibal King'))).toEqual(['Counterspell']);
+    const rush = game.artistCards(artistId('Christopher Rush'));
+    expect(rush).toContain('Brainstorm');
+    expect(new Set(rush).size).toBe(rush.length);
+    expect([...rush].sort((a, b) => a.localeCompare(b))).toEqual(rush);
   });
 
   describe('old-format database', () => {
@@ -77,7 +110,10 @@ describe('game search', () => {
     test('number searches are off', () => {
       expect(oldGame.searchKind('2XM 44')).toBe('name');
       expect(oldGame.findPrinting('2XM 44')).toBeNull();
-      expect(oldGame.numberCandidates('61/350')).toEqual([]);
+      expect(oldGame.numberCandidates('61/350', null)).toEqual([]);
+      expect(oldGame.numberCandidates('61', null)).toEqual([]);
+      expect(oldGame.artistOptions('hann', 5)).toEqual([]);
+      expect(oldGame.artistCards(1)).toEqual([]);
     });
   });
 });
