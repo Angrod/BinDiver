@@ -30,13 +30,14 @@ const FAN_CONTENT = 'BinDiver is unofficial Fan Content permitted under the Fan 
 
 export function SettingsScreen({ visible, codeStatus, onClose }: Props) {
   const {
-    user, priceDate, settings, setSetting, checkNow, lastCheckError, appTooOld, dataBytes,
+    user, priceDate, settings, setSetting, checkNow, lastCheckError, lastCheck, appTooOld, dataBytes,
   } = useAppData();
   const theme = useTheme();
   const [priceOpen, setPriceOpen] = useState(false);
   const [knownOpen, setKnownOpen] = useState(false);
   const [offline, setOffline] = useState(false);
   const [upToDate, setUpToDate] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [checking, setChecking] = useState(false);
   const [exporting, setExporting] = useState(false);
 
@@ -46,6 +47,7 @@ export function SettingsScreen({ visible, codeStatus, onClose }: Props) {
   const check = async (confirmed: boolean) => {
     setOffline(false);
     setUpToDate(false);
+    setBusy(false);
     setChecking(true);
     try {
       const result = await checkNow(confirmed);
@@ -58,6 +60,8 @@ export function SettingsScreen({ visible, codeStatus, onClose }: Props) {
         setOffline(true);
       } else if (result === 'up-to-date') {
         setUpToDate(true);
+      } else if (result === 'busy') {
+        setBusy(true);
       }
     } finally {
       setChecking(false);
@@ -152,6 +156,13 @@ export function SettingsScreen({ visible, codeStatus, onClose }: Props) {
               {button('Check for new prices now', () => void check(false), { disabled: checking })}
               {offline && <Text style={[styles.note, { color: theme.muted }]}>No connection</Text>}
               {upToDate && <Text style={[styles.note, { color: theme.muted }]}>No newer prices yet.</Text>}
+              {busy && <Text style={[styles.note, { color: theme.muted }]}>Already checking for prices.</Text>}
+              {settings.testMode && lastCheck !== null && (
+                <Text style={[styles.note, { color: theme.muted }]}>
+                  Last check {new Date(lastCheck.at).toLocaleString()} ({lastCheck.source}): {lastCheck.result}; phone had{' '}
+                  {lastCheck.local ?? 'no data'}
+                </Text>
+              )}
               {toggle('Allow downloads on cellular', settings.allowCellular, (v) => setSetting('allowCellular', v))}
               {lastCheckError !== null && <Text style={[styles.note, { color: theme.quiet }]}>{lastCheckError}</Text>}
               {appTooOld && <Text style={[styles.note, { color: theme.quiet }]}>{APP_TOO_OLD}</Text>}
