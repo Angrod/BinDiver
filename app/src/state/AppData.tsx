@@ -19,6 +19,18 @@ import { createUserStore, UserStore } from '../user/store';
 export type Phase = 'starting' | 'loading' | 'setup' | 'ready';
 
 export const LAST_CHECK_ERROR = 'last_check_error';
+/** The last price check, for Settings in test mode: who asked, what happened, and the phone's price date then. */
+export const LAST_CHECK = 'last_check';
+export interface LastCheck { at: string; source: 'launch' | 'button' | 'setup'; result: string; local: string | null }
+
+function parseLastCheck(v: string | null): LastCheck | null {
+  if (!v) return null;
+  try {
+    return JSON.parse(v) as LastCheck;
+  } catch {
+    return null;
+  }
+}
 export const APP_TOO_OLD = 'Update the app to get newer prices';
 
 export interface AppDataValue {
@@ -38,9 +50,11 @@ export interface AppDataValue {
    * 'ask' when downloads need the user's OK (cellular with them off) and it wasn't given; 'up-to-date' when the
    * published prices are no newer than the phone's.
    */
-  checkNow(confirmed: boolean): Promise<'ok' | 'up-to-date' | 'ask' | 'offline'>;
+  checkNow(confirmed: boolean): Promise<'ok' | 'up-to-date' | 'busy' | 'ask' | 'offline'>;
   /** The last failed check's error, until a check succeeds. */
   lastCheckError: string | null;
+  /** The last price check's outcome (shown in test mode). */
+  lastCheck: LastCheck | null;
   appTooOld: boolean;
   /** The live card file's size. */
   dataBytes: number | null;
@@ -76,6 +90,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     () => user.getSetting(LAST_CHECK_ERROR) || null,
   );
   const [appTooOld, setAppTooOld] = useState(false);
+  const [lastCheck, setLastCheck] = useState<LastCheck | null>(() => parseLastCheck(user.getSetting(LAST_CHECK)));
   const [dataBytes, setDataBytes] = useState<number | null>(null);
 
   /** The file of the slot recorded as live; the camera-test file when none is recorded. */
@@ -131,12 +146,24 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     setLastCheckError(error);
   }, [user]);
 
+  const recordCheck = useCallback((source: LastCheck['source'], result: string, local: string | null) => {
+    const check: LastCheck = { at: new Date().toISOString(), source, result, local };
+    user.setSetting(LAST_CHECK, JSON.stringify(check));
+    setLastCheck(check);
+  }, [user]);
+
   /**
    * Runs refresh and opens the new slot after `updated`. Returns the message to show, if any, and whether the
    * published prices were no newer than the phone's (false when another check was already running).
    */
-  const runRefresh = useCallback(async (): Promise<{ message: string | null; upToDate: boolean }> => {
-    if (busy.current) return { message: null, upToDate: false };
+  const runRefresh = useCallback(async (
+    source: LastCheck['source'],
+  ): Promise<{ message: string | null; upToDate: boolean; skipped: boolean }> => {
+    const local = currentPriceDate(liveRef.current);
+    if (busy.current) {
+      recordCheck(source, 'skipped: another check is running', local);
+      return { message: null, upToDate: false, skipped: true };
+    }
     busy.current = true;
     try {
       const io = createExpoRefreshIO(cardsDir, closeLive, (slot) => user.setSetting(LIVE_SLOT_KEY, slot));
@@ -147,25 +174,26 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         live: parseSlot(user.getSetting(LIVE_SLOT_KEY)),
       });
       user.setSetting('last_check_at', new Date().toISOString());
+      recordCheck(source, result.status === 'failed' ? `failed: ${result.error}` : result.status, local);
       // A failed refresh never closes the live handle; with none open, the recorded slot may still open.
       if (result.status === 'updated' || (result.status === 'failed' && liveRef.current === null)) {
         await openLive();
       }
       if (result.status === 'failed') {
         recordCheckError(result.error);
-        return { message: result.error, upToDate: false };
+        return { message: result.error, upToDate: false, skipped: false };
       }
       if (result.status === 'app-too-old') {
         setAppTooOld(true);
-        return { message: APP_TOO_OLD, upToDate: false };
+        return { message: APP_TOO_OLD, upToDate: false, skipped: false };
       }
       recordCheckError(null);
       setAppTooOld(false);
-      return { message: null, upToDate: result.status === 'up-to-date' };
+      return { message: null, upToDate: result.status === 'up-to-date', skipped: false };
     } finally {
       busy.current = false;
     }
-  }, [cardsDir, closeLive, openLive, recordCheckError, user]);
+  }, [cardsDir, closeLive, openLive, recordCheck, recordCheckError, user]);
 
   // Latest closure for use from the AppState listener.
   const runRefreshRef = useRef(runRefresh);
@@ -179,7 +207,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     if (!needsCheck(user.getSetting('last_check_at'), new Date())) return;
     const net = await currentNetwork();
     if (downloadPermission(net, readSettings(user).allowCellular) !== 'go') return;
-    await runRefreshRef.current();
+    await runRefreshRef.current('launch');
   }, [cardsDir, liveFile, user]);
 
   useEffect(() => {
@@ -212,7 +240,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         return;
       }
       setStatus('Downloading card data…');
-      const { message: error } = await runRefresh();
+      const { message: error } = await runRefresh('setup');
       if (error) setStatus(error);
       else if (liveRef.current === null) setStatus('The download did not complete. Try again.');
     },
@@ -220,11 +248,12 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   );
 
   const checkNow = useCallback(
-    async (confirmed: boolean): Promise<'ok' | 'up-to-date' | 'ask' | 'offline'> => {
+    async (confirmed: boolean): Promise<'ok' | 'up-to-date' | 'busy' | 'ask' | 'offline'> => {
       const perm = downloadPermission(await currentNetwork(), settings.allowCellular);
       if (perm === 'offline') return 'offline';
       if (perm === 'ask' && !confirmed) return 'ask';
-      const { upToDate } = await runRefresh();
+      const { upToDate, skipped } = await runRefresh('button');
+      if (skipped) return 'busy';
       return upToDate ? 'up-to-date' : 'ok';
     },
     [runRefresh, settings.allowCellular],
@@ -256,10 +285,10 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AppDataValue>(
     () => ({
       game, priceDate, user, phase, status, downloadNow, settings, setSetting, marks, markKnown,
-      unmarkKnown, setKept, checkNow, lastCheckError, appTooOld, dataBytes,
+      unmarkKnown, setKept, checkNow, lastCheckError, lastCheck, appTooOld, dataBytes,
     }),
     [game, priceDate, user, phase, status, downloadNow, settings, setSetting, marks, markKnown,
-      unmarkKnown, setKept, checkNow, lastCheckError, appTooOld, dataBytes],
+      unmarkKnown, setKept, checkNow, lastCheckError, lastCheck, appTooOld, dataBytes],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

@@ -16,7 +16,9 @@ export interface CardMatch {
   lineUsed: string;
 }
 
-export type SearchKind = 'name' | 'set-number' | 'number-total';
+export type SearchKind = 'name' | 'set-number' | 'number-total' | 'number';
+/** The most candidates a number search lists. */
+export const NUMBER_CANDIDATE_LIMIT = 50;
 
 export interface PrintingRef {
   oracleId: string; name: string; scryfallId: string; setCode: string; setName: string;
@@ -46,10 +48,15 @@ export interface Game {
   searchKind(text: string): SearchKind;
   /** The printing a set-and-number text names, or null. */
   findPrinting(text: string): PrintingHit | null;
-  /** Number/total: printings from 1998 on, numbered so, in a set of that printed total. At most 50. */
-  numberCandidates(text: string): PrintingRef[];
-  /** Artists of these candidates whose name matches the typed text, at most `limit`, by name. */
-  artistOptions(candidates: PrintingRef[], typed: string, limit: number): ArtistOption[];
+  /**
+   * Number/total or a bare number: printings from 1998 on with that number (for number/total, in a set
+   * of that printed total), by that artist when one is given, oldest first. At most NUMBER_CANDIDATE_LIMIT.
+   */
+  numberCandidates(text: string, artistId: number | null): PrintingRef[];
+  /** Artists whose name, or a word of it, starts with the typed text, at most `limit`, A to Z. */
+  artistOptions(typed: string, limit: number): ArtistOption[];
+  /** The names of an artist's cards, A to Z, once each. */
+  artistCards(artistId: number): string[];
   /** The basic lands that start as known. */
   basicLands(): KnownCard[];
 }

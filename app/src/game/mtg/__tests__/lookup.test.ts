@@ -30,3 +30,16 @@ test('cardName falls back sensibly', () => {
   const id = cases.find((c) => c.groups.length)!.groups[0];
   expect(cardName(db, id.oracle_id)).toBe(id.name);
 });
+
+test("look-alikes: Ihsan's Shade at $10+ has one, the white-border Anthologies version", () => {
+  const { oracleIds } = resolveExact(db, normalizeName("Ihsan's Shade"));
+  const [g] = lookupGroups(db, oracleIds, 1000, 'oldest');
+  expect(g.lookAlikes.map((x) => [x.setName, x.priceCents, x.lookFor])).toEqual([
+    ['Anthologies', 20, 'art by Christopher Rush, white border'],
+  ]);
+});
+
+test('look-alikes: none when nothing is at the price', () => {
+  const { oracleIds } = resolveExact(db, normalizeName('Bloodfell Caves'));
+  expect(lookupGroups(db, oracleIds, 1000, 'oldest')[0].lookAlikes).toEqual([]);
+});

@@ -1,6 +1,6 @@
 import type { Version } from '../../game/types';
 import {
-  countLine, formatBytes, formatPriceDate, missingVersionLine, nothingLines,
+  cautionLine, countLine, formatBytes, formatPriceDate, missingVersionLine, nothingLines,
   parsePrice, readAsLine, rowViews, stickyLine,
 } from '../resultView';
 
@@ -78,6 +78,17 @@ describe('lines', () => {
   });
   it('missingVersionLine', () => {
     expect(missingVersionLine('MOM', '123', 1000)).toBe("This version (MOM #123) isn't at $10+.");
+  });
+  it('cautionLine: one look-alike is named, with how to spot it', () => {
+    expect(cautionLine([v({ setName: 'Chronicles', lookFor: 'white border' })], 200))
+      .toBe('Careful: the Chronicles version looks alike and is under $2: white border.');
+    expect(cautionLine([v({ setName: 'Chronicles', lookFor: '' })], 750))
+      .toBe('Careful: the Chronicles version looks alike and is under $7.50.');
+  });
+  it('cautionLine: several are counted, none gives no line', () => {
+    expect(cautionLine([v({ scryfallId: 'a' }), v({ scryfallId: 'b' })], 1000))
+      .toBe('Careful: 2 cheaper versions look alike. Compare them in the list.');
+    expect(cautionLine([], 1000)).toBeNull();
   });
 });
 

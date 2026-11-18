@@ -23,18 +23,20 @@ describe('resultCardLines', () => {
   test('Counterspell: a full alert, with its count over every version', () => {
     expect(lines(read('Counterspell'))).toEqual({
       label: 'Worth finding', name: 'Counterspell', count: '36 of 106 versions at $10+', hint: expect.any(String), notes: [],
+      caution: expect.stringMatching(/^Careful: \d+ cheaper versions look alike\. Compare them in the list\.$/),
     });
   });
 
   test('Juzám Djinn: a quiet alert shows the quiet label', () => {
     expect(lines(read('Juzám Djinn'))).toEqual({
       label: 'Old border only · 1 version at $10+', name: 'Juzám Djinn', count: '1 of 2 versions at $10+', hint: expect.any(String), notes: [],
+      caution: null,
     });
   });
 
   test('Bloodfell Caves: nothing at the price says so, with no label', () => {
     expect(lines(read('Bloodfell Caves'))).toEqual({
-      label: null, name: 'Bloodfell Caves', count: 'Nothing at $10+', hint: null, notes: [],
+      label: null, name: 'Bloodfell Caves', count: 'Nothing at $10+', hint: null, notes: [], caution: null,
     });
   });
 
@@ -42,14 +44,14 @@ describe('resultCardLines', () => {
     const island = read('Island');
     const marks: KnownMarks = { isKnown: (id) => island.oracleIds.includes(id), kept: () => new Set() };
     expect(lines(island, { marks })).toEqual({
-      label: 'Known', name: 'Island', count: '67 of 1193 versions at $10+', hint: null, notes: [],
+      label: 'Known', name: 'Island', count: '67 of 1193 versions at $10+', hint: null, notes: [], caution: null,
     });
   });
 
   test('a Saproling token shows its name and that tokens are not tracked', () => {
     // A token's match carries the normalized name, as the panel shows it.
     expect(lines(read('Saproling'))).toEqual({
-      label: null, name: 'saproling', count: 'Token, not tracked', hint: null, notes: [],
+      label: null, name: 'saproling', count: 'Token, not tracked', hint: null, notes: [], caution: null,
     });
   });
 
@@ -57,7 +59,7 @@ describe('resultCardLines', () => {
     const token = { ...read('Saproling'), match: 'tolerant' as const, lineUsed: 'saprolinq' };
     expect(lines(token)).toEqual({
       label: null, name: 'saproling', count: 'Token, not tracked',
-      hint: null, notes: ['Read as “saprolinq”. Not this card? Tap Search.'],
+      hint: null, notes: ['Read as “saprolinq”. Not this card? Tap Search.'], caution: null,
     });
   });
 
@@ -65,7 +67,7 @@ describe('resultCardLines', () => {
     // lineUsed is the normalized line read, as the panel shows it.
     expect(lines(read('Bloodfell Caues'))).toEqual({
       label: null, name: 'Bloodfell Caves', count: 'Nothing at $10+',
-      hint: null, notes: ['Read as “bloodfell caues”. Not this card? Tap Search.'],
+      hint: null, notes: ['Read as “bloodfell caues”. Not this card? Tap Search.'], caution: null,
     });
   });
 
@@ -75,6 +77,7 @@ describe('resultCardLines', () => {
     expect(lines(hit.match, { thisVersion: hit.printing.scryfallId })).toEqual({
       label: 'Old border only · 4 versions at $10+', name: 'Fireball', count: '4 of 49 versions at $10+',
       hint: expect.any(String), notes: ["This version (M10 #136) isn't at $10+."],
+      caution: expect.stringMatching(/^Careful: \d+ cheaper versions look alike\. Compare them in the list\.$/),
     });
   });
 
@@ -150,6 +153,28 @@ describe('resultCardLines hint', () => {
   });
   test('a token has none', () => {
     expect(lines(read('Saproling')).hint).toBeNull();
+  });
+});
+
+describe('resultCardLines caution', () => {
+  test("Ihsan's Shade: its one look-alike is named", () => {
+    expect(lines(read("Ihsan's Shade")).caution)
+      .toBe('Careful: the Anthologies version looks alike and is under $10: art by Christopher Rush, white border.');
+  });
+  test('Counterspell: its look-alikes are counted over the model', () => {
+    const counterspell = read('Counterspell');
+    const model = resultModel(game, { match: counterspell, thisVersion: null }, TEN, 'oldest', NO_MARKS);
+    const n = model.groups[0].lookAlikes.length;
+    expect(n).toBeGreaterThan(1);
+    expect(lines(counterspell).caution).toBe(`Careful: ${n} cheaper versions look alike. Compare them in the list.`);
+  });
+  test('none for a card with no look-alike, nothing at the price, a known card or a token', () => {
+    expect(lines(read('Juzám Djinn')).caution).toBeNull();
+    expect(lines(read('Bloodfell Caves')).caution).toBeNull();
+    const island = read('Island');
+    const marks: KnownMarks = { isKnown: (id) => island.oracleIds.includes(id), kept: () => new Set() };
+    expect(lines(island, { marks }).caution).toBeNull();
+    expect(lines(read('Saproling')).caution).toBeNull();
   });
 });
 

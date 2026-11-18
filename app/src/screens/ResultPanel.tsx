@@ -59,7 +59,7 @@ export const ResultPanel = memo(function ResultPanel({ shown }: Props) {
   }, [game, shown, minCents, sort, marks]);
   const iconFor = useMemo(() => iconCache(game), [game]);
 
-  // Open rows (by version key) and open unpriced folds (by oracle ID). The scan screen remounts the
+  // Open rows (by version key) and open folds (unpriced by oracle ID, look-alikes by "la:" and oracle ID). The scan screen remounts the
   // panel for each new card, so these start closed.
   const [openRows, setOpenRows] = useState<ReadonlySet<string>>(() => new Set());
   const [openFolds, setOpenFolds] = useState<ReadonlySet<string>>(() => new Set());
@@ -167,6 +167,7 @@ export const ResultPanel = memo(function ResultPanel({ shown }: Props) {
           const [nothingTitle, nothingDetail] = nothingLines(g.totalVersions, minCents);
           const kept = marks.isKnown(g.oracleId) ? marks.kept(g.oracleId) : null;
           const folded = !openFolds.has(g.oracleId);
+          const alikeFolded = !openFolds.has(`la:${g.oracleId}`);
           return [
             <View key={`h:${g.oracleId}`} style={styles.header} onLayout={onHeaderLayout(i)}>
               {several ? (
@@ -195,6 +196,20 @@ export const ResultPanel = memo(function ResultPanel({ shown }: Props) {
             </View>,
             <View key={`l:${g.oracleId}`} style={[styles.list, { borderColor: theme.divider }, nothing && styles.listAfterNothing]}>
               {rows(g, rowViews(g.qualifying, g.versionsByKey, shown.thisVersion), kept)}
+              {g.lookAlikes.length > 0 && (
+                <Pressable
+                  style={[styles.fold, { borderColor: theme.divider }, !alikeFolded && styles.foldOpen]}
+                  onPress={() => toggle(setOpenFolds, `la:${g.oracleId}`)}
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded: !alikeFolded }}
+                >
+                  <Text style={[styles.foldText, { color: theme.muted }]}>
+                    {`Cheaper look-alikes (${g.lookAlikes.length})`}
+                  </Text>
+                  <Icon name={alikeFolded ? 'down' : 'up'} size={16} color={theme.muted} />
+                </Pressable>
+              )}
+              {!alikeFolded && rows(g, rowViews(g.lookAlikes, g.versionsByKey, shown.thisVersion), kept)}
               {g.unpriced.length > 0 && (
                 <Pressable
                   style={[styles.fold, { borderColor: theme.divider }, !folded && styles.foldOpen]}

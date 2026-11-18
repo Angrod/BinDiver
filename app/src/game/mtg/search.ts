@@ -1,12 +1,15 @@
-// Typed searches for cards the camera can't read: set code + collector number, or number/total.
+// Typed searches for cards the camera can't read: set code + collector number, number/total, or a bare number.
 export type ParsedSearch =
   | { kind: 'name' }
   | { kind: 'set-number'; pairs: Array<{ set: string; number: string }> }
-  | { kind: 'number-total'; number: string; total: number };
+  | { kind: 'number-total'; number: string; total: number }
+  | { kind: 'number'; number: string };
 
 const LIST_TOKEN = /^[a-z0-9]{2,5}-[a-z0-9]+$/;
 const SET_TOKEN = /^[a-z0-9]{2,6}$/;
 const NUMBER_TOKEN = /^(\d+)([a-z★†]{0,2})$/;
+// A number typed on its own takes at most one suffix letter, so "7ed" (a set code) stays a name.
+const BARE_NUMBER = /^\d+[a-z★†]?$/;
 
 function asSet(token: string): string | null {
   return SET_TOKEN.test(token) && /[a-z]/.test(token) ? token : null;
@@ -25,6 +28,11 @@ export function parseSearch(text: string): ParsedSearch {
   const tokens = t.split(/\s+/)
     .filter((tok) => !/^[a-z]$/.test(tok))
     .map((tok) => tok.split('/')[0]);
+
+  if (tokens.length === 1 && BARE_NUMBER.test(tokens[0])) {
+    const number = asNumber(tokens[0]);
+    if (number) return { kind: 'number', number };
+  }
 
   const listIdx = tokens.findIndex((tok) => LIST_TOKEN.test(tok));
   if (tokens.length === 1 && listIdx === 0) {

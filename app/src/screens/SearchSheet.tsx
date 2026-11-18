@@ -4,9 +4,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppData } from '../state/AppData';
-import type { ArtistOption, CardMatch, PrintingRef } from '../game/types';
+import type { ArtistOption, CardMatch } from '../game/types';
 import { SetIcon } from './SetIcon';
-import { searchList, type SearchItem } from './searchList';
+import { searchList, searchNote, type SearchItem } from './searchList';
 import { useTheme } from './theme';
 
 interface Props {
@@ -15,9 +15,9 @@ interface Props {
   onCancel(): void;
 }
 
-const HINT = 'Name, or set and number (MOM 123), or number/total (38/143)';
+const HINT = 'Name, set and number (MOM 123), number/total (38/143), or just the number (420)';
 const OLD_LABEL = 'Card name (English)';
-const PRE_1998 = 'Cards from before 1998 have no number: type the English name.';
+const PRE_1998 = 'Cards from before 1998 have no number: type the English name or the artist.';
 
 export function SearchSheet({ visible, onPick, onCancel }: Props) {
   const { game } = useAppData();
@@ -30,40 +30,27 @@ export function SearchSheet({ visible, onPick, onCancel }: Props) {
   const numberSearch = game?.numberSearch ?? false;
   const kind = game && text.trim() !== '' ? game.searchKind(text) : 'name';
 
-  // Computed once per text change; the Artist box only filters it.
-  const candidates = useMemo<PrintingRef[]>(() => {
-    if (!game || kind !== 'number-total') return [];
-    try {
-      return game.numberCandidates(text);
-    } catch (e) {
-      console.warn('numberCandidates failed', e);
-      return [];
-    }
-  }, [game, kind, text]);
-
   const items = useMemo<SearchItem[]>(() => {
     if (!game) return [];
     try {
-      return searchList(
-        { ...game, numberCandidates: () => candidates },
-        text,
-        artist?.id ?? null,
-      );
+      return searchList(game, text, artist?.id ?? null);
     } catch (e) {
       console.warn('search failed', e);
       return [];
     }
-  }, [game, text, artist, candidates]);
+  }, [game, text, artist]);
 
   const artistOptions = useMemo<ArtistOption[]>(() => {
-    if (!game || kind !== 'number-total' || artist || artistText.trim() === '') return [];
+    if (!game || !numberSearch || artist || artistText.trim() === '') return [];
     try {
-      return game.artistOptions(candidates, artistText, 5);
+      return game.artistOptions(artistText, 5);
     } catch (e) {
       console.warn('artistOptions failed', e);
       return [];
     }
-  }, [game, kind, candidates, artist, artistText]);
+  }, [game, numberSearch, artist, artistText]);
+
+  const note = numberSearch ? searchNote(kind, text, items.length, artist !== null) : null;
 
   const reset = () => {
     setNotFound(false);
@@ -128,8 +115,6 @@ export function SearchSheet({ visible, onPick, onCancel }: Props) {
           onChangeText={(t) => {
             setText(t);
             setNotFound(false);
-            setArtistText('');
-            setArtist(null);
           }}
           accessibilityLabel={label}
           onSubmitEditing={() => {
@@ -143,6 +128,42 @@ export function SearchSheet({ visible, onPick, onCancel }: Props) {
           autoCorrect={false}
           autoCapitalize="none"
         />
+        {numberSearch && (
+          <View style={styles.artistBox}>
+            <Text style={[styles.label, { color: theme.muted }]}>Artist</Text>
+            <TextInput
+              style={[styles.input, { borderColor: theme.border, backgroundColor: theme.panel, color: theme.text }]}
+              value={artist ? artist.name : artistText}
+              onChangeText={(t) => {
+                setArtist(null);
+                setArtistText(t);
+              }}
+              accessibilityLabel="Artist"
+              onSubmitEditing={() => {
+                const first = artistOptions[0];
+                if (first) {
+                  setArtist(first);
+                  setArtistText('');
+                }
+              }}
+              returnKeyType="done"
+              autoCorrect={false}
+              autoCapitalize="none"
+            />
+            {artistOptions.map((o) => (
+              <Pressable
+                key={o.id}
+                style={rowStyle}
+                onPress={() => {
+                  setArtist(o);
+                  setArtistText('');
+                }}
+              >
+                <Text style={[styles.rowText, { color: theme.text }]}>{o.name}</Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
         {numberSearch && <Text style={[styles.note, { color: theme.muted }]}>{PRE_1998}</Text>}
         <ScrollView keyboardShouldPersistTaps="handled" style={styles.list}>
           {items.map((item) => {
@@ -175,34 +196,7 @@ export function SearchSheet({ visible, onPick, onCancel }: Props) {
           })}
         </ScrollView>
         {notFound && <Text style={[styles.note, { color: theme.text }]}>No card by that name</Text>}
-        {kind === 'number-total' && (
-          <View style={styles.artistBox}>
-            <Text style={[styles.label, { color: theme.muted }]}>Artist</Text>
-            <TextInput
-              style={[styles.input, { borderColor: theme.border, backgroundColor: theme.panel, color: theme.text }]}
-              value={artist ? artist.name : artistText}
-              onChangeText={(t) => {
-                setArtist(null);
-                setArtistText(t);
-              }}
-              accessibilityLabel="Artist"
-              autoCorrect={false}
-              autoCapitalize="none"
-            />
-            {artistOptions.map((o) => (
-              <Pressable
-                key={o.id}
-                style={rowStyle}
-                onPress={() => {
-                  setArtist(o);
-                  setArtistText('');
-                }}
-              >
-                <Text style={[styles.rowText, { color: theme.text }]}>{o.name}</Text>
-              </Pressable>
-            ))}
-          </View>
-        )}
+        {note !== null && <Text style={[styles.note, { color: theme.text }]}>{note}</Text>}
         <View style={styles.cancel}>
           <Button title="Cancel" onPress={cancel} color={theme.link} />
         </View>
@@ -215,7 +209,8 @@ const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, gap: 8 },
   label: { fontSize: 12 },
   input: { borderWidth: 2, borderRadius: 12, paddingHorizontal: 14, height: 46, fontSize: 17 },
-  list: { flexGrow: 0 },
+  // Shrinks to the room left, so a long list (an artist's cards) scrolls instead of pushing Cancel off.
+  list: { flexGrow: 0, flexShrink: 1 },
   row: { paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   rowText: { fontSize: 16 },
   sub: { fontSize: 13 },
