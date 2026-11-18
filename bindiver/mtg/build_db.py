@@ -109,6 +109,15 @@ def _index_names(conn, card, oracle_id, full_kind, face_kind):
             "INSERT OR IGNORE INTO names VALUES (?, ?, ?)",
             (normalize_name(face["name"]), oracle_id, face_kind),
         )
+    if full_kind != "full":
+        return
+    # Secret Lair, Godzilla and other crossover cards print a flavor name as the big title ("Hero of Light"
+    # for Adeline, Resplendent Cathar), so it is indexed as a face: a card's real full name still wins.
+    # Japanese flavor names normalize to nothing and are skipped: an empty name would match any unreadable line.
+    for flavor in [card.get("flavor_name")] + [f.get("flavor_name") for f in card.get("card_faces") or []]:
+        norm = normalize_name(flavor) if flavor else ""
+        if norm:
+            conn.execute("INSERT OR IGNORE INTO names VALUES (?, ?, ?)", (norm, oracle_id, face_kind))
 
 
 def _spot_pass(conn, hand_notes):

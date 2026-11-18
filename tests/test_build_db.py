@@ -5,6 +5,7 @@ from pathlib import Path
 
 from bindiver.mtg.build_db import build_db, iter_bulk
 from bindiver.mtg.spot import printing_traits
+from conftest import make_card
 
 
 def test_iter_bulk_reads_gzipped_jsonl(tmp_path):
@@ -60,3 +61,61 @@ def test_build_stores_quiet_kinds_and_printed_totals(tmp_path):
         assert kinds[code] == "old border", code
     assert kinds["dmr"] == ""
     assert kinds["sld"] == "Secret Lair"
+
+
+def _names(db):
+    return sorted(sqlite3.connect(db).execute("SELECT norm, oracle_id, kind FROM names").fetchall())
+
+
+def test_flavor_names_are_indexed_as_faces_of_the_real_card(tmp_path):
+    # Secret Lair and Godzilla cards print a flavor name as the big title, the real name small below it.
+    cards = [
+        make_card(id="adeline", oracle_id="o-adeline", name="Adeline, Resplendent Cathar",
+                  set="sld", set_name="Secret Lair Drop", flavor_name="Hero of Light"),
+        make_card(id="brokkos", oracle_id="o-brokkos", name="Brokkos, Apex of Forever", set="iko",
+                  set_name="Ikoria: Lair of Behemoths", flavor_name="Bio-Quartz Spacegodzilla"),
+    ]
+    db = tmp_path / "flavor.sqlite"
+    build_db(cards, db, price_date="2026-11-18")
+    assert _names(db) == [
+        ("adeline resplendent cathar", "o-adeline", "full"),
+        ("bio quartz spacegodzilla", "o-brokkos", "face"),
+        ("brokkos apex of forever", "o-brokkos", "full"),
+        ("hero of light", "o-adeline", "face"),
+    ]
+
+
+def test_flavor_names_of_card_faces_are_indexed_too(tmp_path):
+    card = make_card(id="mdfc", oracle_id="o-mdfc", name="Front // Back", layout="modal_dfc", card_faces=[
+        {"name": "Front", "flavor_name": "Flavor Front"}, {"name": "Back"}])
+    db = tmp_path / "faces.sqlite"
+    build_db([card], db, price_date="2026-11-18")
+    assert ("flavor front", "o-mdfc", "face") in _names(db)
+
+
+def test_a_flavor_name_never_replaces_a_real_name(tmp_path):
+    # A flavor name that is also some card's real name stays that card's: the real one is kept as full.
+    cards = [
+        make_card(id="real", oracle_id="o-real", name="Shared Name"),
+        make_card(id="other", oracle_id="o-other", name="Other Card", flavor_name="Shared Name"),
+    ]
+    db = tmp_path / "shared.sqlite"
+    build_db(cards, db, price_date="2026-11-18")
+    shared = [r for r in _names(db) if r[0] == "shared name"]
+    assert ("shared name", "o-real", "full") in shared
+
+
+def test_tokens_get_no_flavor_names(tmp_path):
+    token = make_card(id="tok", oracle_id="o-tok", name="Soldier", layout="token", flavor_name="Hero Token")
+    db = tmp_path / "token.sqlite"
+    build_db([token], db, price_date="2026-11-18")
+    assert _names(db) == [("soldier", "o-tok", "token")]
+
+
+
+def test_a_flavor_name_with_no_latin_letters_is_skipped(tmp_path):
+    # Japanese flavor names normalize to nothing; an empty name would match any unreadable line.
+    card = make_card(id="jp", oracle_id="o-jp", name="Real Name", flavor_name="ゴジラ")
+    db = tmp_path / "jp.sqlite"
+    build_db([card], db, price_date="2026-11-18")
+    assert _names(db) == [("real name", "o-jp", "full")]
